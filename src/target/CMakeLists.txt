@@ -1,0 +1,19 @@
+message(STATUS "entering: ${CMAKE_CURRENT_SOURCE_DIR}")
+
+#add sources
+set(SOURCES_TARGET 
+    ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp 
+    ${CMAKE_CURRENT_SOURCE_DIR}/world.cpp 
+    ${CMAKE_CURRENT_SOURCE_DIR}/gun.cpp 
+    ${CMAKE_CURRENT_SOURCE_DIR}/entity.cpp 
+    ${CMAKE_CURRENT_SOURCE_DIR}/player.cpp 
+    ${CMAKE_CURRENT_SOURCE_DIR}/enemy.cpp 
+    PARENT_SCOPE)
+
+set(HEADERS_TARGET
+    ${CMAKE_CURRENT_SOURCE_DIR}/world.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/gun.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/entity.h 
+    ${CMAKE_CURRENT_SOURCE_DIR}/player.h 
+    ${CMAKE_CURRENT_SOURCE_DIR}/enemy.h 
+    PARENT_SCOPE)
