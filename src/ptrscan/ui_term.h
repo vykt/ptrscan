@@ -4,6 +4,8 @@
 #include <vector>
 #include <string>
 
+#include <cstdint>
+
 #include <libpwu.h>
 
 #include "ui_base.h"
@@ -13,7 +15,6 @@
 class ui_term : public ui_base {
 
     public:
-        virtual int process_args(int argc, char ** argv);
         virtual int clarify_pid(name_pid * n_pid);
 
 };

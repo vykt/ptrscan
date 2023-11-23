@@ -113,7 +113,7 @@ inline void proc_mem::add_static(std::vector<static_region> * static_vector,
 }
 
 
-void proc_mem::populate_regions(std::vector<static_region> * extra_static_vector,
+void proc_mem::populate_regions(std::vector<static_region> * extra_region_vector,
                                    std::string target_str) {
 
     const char * exception_str[1] = {
@@ -128,8 +128,8 @@ void proc_mem::populate_regions(std::vector<static_region> * extra_static_vector
 
 
     //add standard static regions to static_regions_vector
-    extra_static_vector->insert(extra_static_vector->begin(), stack_region);
-    extra_static_vector->insert(extra_static_vector->begin(), bss_region);
+    extra_region_vector->insert(extra_region_vector->begin(), stack_region);
+    extra_region_vector->insert(extra_region_vector->begin(), bss_region);
 
     //for every memory region with distinct access permissions
     for (int i = 0; i < (int) this->m_data.entry_vector.length; ++i) {
@@ -148,7 +148,7 @@ void proc_mem::populate_regions(std::vector<static_region> * extra_static_vector
         }
 
         //add static region
-        add_static(extra_static_vector, m_entry);
+        add_static(extra_region_vector, m_entry);
     
     } //end for
 
@@ -171,7 +171,7 @@ void proc_mem::populate_regions(std::vector<static_region> * extra_static_vector
  *
  */
 proc_mem::proc_mem(std::string target_str, byte flags,
-                   std::vector<static_region> * extra_static_vector) {
+                   args_struct * args) {
 
     const char * exception_str[1] = {
         "proc_mem -> constructor: failed to open handles on proc maps and mem."
@@ -191,9 +191,8 @@ proc_mem::proc_mem(std::string target_str, byte flags,
     //read proc maps
     maps_init(&this->m_data);
 
-    //TODO get the extra static vector from ui
-
     //get a vector of every rw- memory region
-    populate_regions(/*STATIC REGION VECTOR TODO*/, target_str);
+    populate_regions(&args->extra_region_vector, target_str);
 
+    return;
 }

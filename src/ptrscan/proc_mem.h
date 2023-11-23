@@ -36,7 +36,7 @@ class proc_mem {
 
         //public methods
         proc_mem(std::string target_str, byte flags,
-                 std::vector<static_region> * extra_static_vector = nullptr);
+                 args_struct * args);
 
     private:
         //private methods
