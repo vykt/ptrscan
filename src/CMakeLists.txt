@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.13)
 
 #define build tools
 set(CMAKE_C_COMPILER "gcc")
@@ -9,11 +9,17 @@ project(ptrscan VERSION 0.0.1 DESCRIPTION "ptrscan for a linux environment" LANG
 
 #set sources
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/target)
-
-message(STATUS "sources: ${SOURCES_TARGET} \nheaders: ${HEADERS_TARGET}")
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/ptrscan)
 
 #define targets
 add_executable(example_proc ${SOURCES_TARGET} ${HEADERS_TARGET})
+add_executable(scan ${SOURCES_PTRSCAN} ${HEADERS_PTRSCAN})
 
+#example process options
 target_compile_features(example_proc PUBLIC cxx_std_14)
 target_compile_options(example_proc PUBLIC -ggdb -O0 -Wall)
+
+#ptrscan options
+target_compile_features(scan PUBLIC cxx_std_14)
+target_compile_options(scan PUBLIC -ggdb -O0 -Wall)
+target_link_options(scan PUBLIC -lpwu)

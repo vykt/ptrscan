@@ -20,22 +20,14 @@ typedef struct {
 
 } static_region;
 
-typedef struct {
-
-    byte ui_type;
-    uintptr_t ptr_lookback;
-    unsigned int levels;
-    std::vector<static_region> extra_region_vector;
-
-} args_struct;
-
 
 //abstract ui class, inherited from by terminal and tui ncurses interfaces
 class ui_base {
 
     public:
         //methods
-        virtual int clarify_pid(name_pid * n_pid) = 0;
+        virtual void report_exception(const std::exception& e) = 0;
+        virtual pid_t clarify_pid(name_pid * n_pid) = 0;
 
 };
 

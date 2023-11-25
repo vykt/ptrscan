@@ -10,6 +10,7 @@
 
 #include <libpwu.h>
 
+#include "args.h"
 #include "ui_base.h"
 
 
@@ -35,17 +36,14 @@ class proc_mem {
         std::vector<maps_entry *> static_regions_vector;
 
         //public methods
-        proc_mem(std::string target_str, byte flags,
-                 args_struct * args);
+        void init_proc_mem(args_struct * args, ui_base * ui);
 
     private:
         //private methods
-        void fetch_pid(std::string target_str);
+        void fetch_pid(args_struct * args, ui_base * ui);
         void maps_init(maps_data * m_data);
-        void add_static(std::vector<static_region> * static_vector,
-                        maps_entry * m_entry);
-        void populate_regions(std::vector<static_region> * extra_static_vector,
-                              std::string target_str);
+        void add_static(args_struct * args, maps_entry * m_entry);
+        void populate_regions(args_struct * args);
 };
 
 #endif

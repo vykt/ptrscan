@@ -1,4 +1,5 @@
 #include <iostream>
+#include <stdexcept>
 
 #include <cstdlib>
 #include <cstring>
@@ -9,11 +10,16 @@
 
 #include <libpwu.h>
 
+#include "args.h"
 #include "ui_base.h"
 
 
 
-int process_extra_static_regions(args_struct * args, char * regions) {
+void process_extra_static_regions(args_struct * args, char * regions) {
+
+    const char * exception_str[1] {
+        "process_extra_static_regions: invalid static region format."
+    };
 
     char * next_region_str;
     char * lookahead_comma;
@@ -29,13 +35,15 @@ int process_extra_static_regions(args_struct * args, char * regions) {
 
         //get lookahead pointers
         lookahead_comma = strrchr(next_region_str, ',');
-        if (lookahead_comma == NULL) return -1; //incorrect format
+        if (lookahead_comma == NULL) {
+            throw std::runtime_error(exception_str[0]);
+        }
 
         lookahead_slash = strrchr(next_region_str, ':');
 
         //check if next_region_str doesn't have a comma 
         if (lookahead_slash != NULL && lookahead_comma > lookahead_slash) {
-            return -1; //incorrect format
+            throw std::runtime_error(exception_str[0]);
         }
 
         //build temp_region
@@ -49,17 +57,19 @@ int process_extra_static_regions(args_struct * args, char * regions) {
         args->extra_region_vector.insert(args->extra_region_vector.end(), temp_region);
 
     } while((next_region_str = strrchr(next_region_str, ':')) != nullptr);
-    
-    return 0;
 }
 
 
 
-int process_args(int argc, char ** argv, args_struct * args) {
+void process_args(int argc, char ** argv, args_struct * args) {
 
-    int ret, opt, opt_index;
+    const char * exception_str[3] = {
+        "process_args: no argument provided for -p --ptr-lookback",
+        "process_args: no argument provided for -l --levels",
+        "process_args: no argument provided for -s --extra-static-regions"
+    };
 
-    //defined options
+    //defined cmdline options
     struct option long_opts[] = {
         {"ui-term", no_argument, nullptr, 't'},
         {"ui-ncurses", no_argument, nullptr, 'n'},
@@ -68,6 +78,9 @@ int process_args(int argc, char ** argv, args_struct * args) {
         {"extra-static-regions", required_argument, NULL, 's'},
         {0,0,0,0}
     };
+
+    int opt, opt_index;
+
 
     //set default UI type
     args->ui_type = UI_TERM;
@@ -80,43 +93,47 @@ int process_args(int argc, char ** argv, args_struct * args) {
         //determine parsed argument
         switch (opt) {
 
-            case 't':
+            case 't': //terminal UI
                 args->ui_type = UI_TERM;
                 break;
 
-            case 'n':
+            case 'n': //ncurses UI
                 args->ui_type = UI_NCURSES;
                 break;
 
-            case 'p':
+            case 'p': //pointer lookback
                 if (optarg == nullptr) {
                     std::cerr << "use: -p <limit:uint> --ptr-lookback=<limit:uint>"
                               << std::endl;
-                    return -1;
+                    throw std::runtime_error(exception_str[0]);
                 }
                 args->ptr_lookback = (uintptr_t) atol(optarg);
                 break;
             
-            case 'l':
+            case 'l': //depth level
                 if (optarg == nullptr) {
                     std::cerr << "use: -l <depth:uint> --levels=<depth:uint>"
                               << std::endl;
-                    return -1;
+                    throw std::runtime_error(exception_str[0]);
                 }
                 break;
             
-            case 's':
+            case 's': //extra memory regions to treat as static
                 if (optarg == nullptr) {
                     std::cerr << "use: -s <region> --extra-static-regions=<region>"
                               << std::endl;
-                    return -1;
+                    throw std::runtime_error(exception_str[0]);
                 }
-                ret = process_extra_static_regions(args, optarg);
+                //process each additional static region
+                process_extra_static_regions(args, optarg);
                 break;
 
         } //end switch
 
     } //end opt while loop
 
-    return -1;
+    //assign target string
+    args->target_str.assign(argv[optind]);    
+
+    return;
 }

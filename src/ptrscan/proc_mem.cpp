@@ -10,12 +10,11 @@
 #include <libpwu.h>
 
 #include "proc_mem.h"
+#include "args.h"
 #include "ui_base.h"
 
 
-
-
-void proc_mem::fetch_pid(std::string target_str) {
+void proc_mem::fetch_pid(args_struct * args, ui_base * ui) {
 
     const char * exception_str[3] = {
         "proc_mem -> fetch_pid: failed to initialise new_name_pid struct.",
@@ -28,7 +27,7 @@ void proc_mem::fetch_pid(std::string target_str) {
 
     //initialise name_pid structure
     name_pid n_pid;
-    ret = new_name_pid(&n_pid, (char *) target_str.c_str());
+    ret = new_name_pid(&n_pid, (char *) args->target_str.c_str());
     if (ret) {
         throw std::runtime_error(exception_str[0]);
     }
@@ -45,13 +44,14 @@ void proc_mem::fetch_pid(std::string target_str) {
         case 1:
             break;
         default:
-            //TODO CALL ui_base::clarify_pid() to get single pid from list of multiple
+            pid = ui->clarify_pid(&n_pid);
             break;
     }
 
     ret = del_name_pid(&n_pid);
     //not worth exception on fail
 
+    this->pid = pid;
     return;
 }
 
@@ -81,8 +81,7 @@ void proc_mem::maps_init(maps_data * m_data) {
 }
 
 
-inline void proc_mem::add_static(std::vector<static_region> * static_vector,
-                                 maps_entry * m_entry) {
+inline void proc_mem::add_static(args_struct * args, maps_entry * m_entry) {
 
     int ret;
     static_region * temp_region;
@@ -90,9 +89,9 @@ inline void proc_mem::add_static(std::vector<static_region> * static_vector,
     const char * name_substring = strrchr((const char *) m_entry->pathname, '/');
 
     //for every static region
-    for (int i = 0; i < static_vector->size(); ++i) {
+    for (unsigned int i = 0; i < args->extra_region_vector.size(); ++i) {
 
-        temp_region = &(*static_vector)[i];
+        temp_region = &(args->extra_region_vector)[i];
 
         //continue if pathname doesn't match
         ret = strncmp(name_substring, temp_region->pathname.c_str(), NAME_MAX);
@@ -104,7 +103,7 @@ inline void proc_mem::add_static(std::vector<static_region> * static_vector,
 
         //if reached here, its a match
         this->static_regions_vector.insert(this->static_regions_vector.end(), m_entry);
-        static_vector->erase(static_vector->begin() + i);
+        args->extra_region_vector.erase(args->extra_region_vector.begin() + i);
         break; //should never match more than one entry
 
     } //end for every static region
@@ -113,23 +112,22 @@ inline void proc_mem::add_static(std::vector<static_region> * static_vector,
 }
 
 
-void proc_mem::populate_regions(std::vector<static_region> * extra_region_vector,
-                                   std::string target_str) {
+void proc_mem::populate_regions(args_struct * args) {
 
     const char * exception_str[1] = {
         "proc_mem -> populate_rw_regions: vector get reference error."
     };
 
     const static_region stack_region = { "[stack]", 0, 0 };
-    const static_region bss_region = { target_str, 0, 0 };
+    const static_region bss_region = { args->target_str, 0, 0 };
 
     int ret;
     maps_entry * m_entry;
 
 
     //add standard static regions to static_regions_vector
-    extra_region_vector->insert(extra_region_vector->begin(), stack_region);
-    extra_region_vector->insert(extra_region_vector->begin(), bss_region);
+    args->extra_region_vector.insert(args->extra_region_vector.begin(), stack_region);
+    args->extra_region_vector.insert(args->extra_region_vector.begin(), bss_region);
 
     //for every memory region with distinct access permissions
     for (int i = 0; i < (int) this->m_data.entry_vector.length; ++i) {
@@ -148,7 +146,7 @@ void proc_mem::populate_regions(std::vector<static_region> * extra_region_vector
         }
 
         //add static region
-        add_static(extra_region_vector, m_entry);
+        add_static(args, m_entry);
     
     } //end for
 
@@ -157,7 +155,6 @@ void proc_mem::populate_regions(std::vector<static_region> * extra_region_vector
 
 
 /*
- *  TODO
  *
  *  1) convert target_str to a PID, then open maps and mem for PID
  *
@@ -170,8 +167,7 @@ void proc_mem::populate_regions(std::vector<static_region> * extra_region_vector
  *  4) process esr_vec and add any entries to static_regions_vec
  *
  */
-proc_mem::proc_mem(std::string target_str, byte flags,
-                   args_struct * args) {
+void proc_mem::init_proc_mem(args_struct * args, ui_base * ui) {
 
     const char * exception_str[1] = {
         "proc_mem -> constructor: failed to open handles on proc maps and mem."
@@ -180,7 +176,7 @@ proc_mem::proc_mem(std::string target_str, byte flags,
     int ret;
     
     //get PID for target process
-    fetch_pid(target_str);
+    fetch_pid(args, ui);
 
     //open file handles
     ret = open_memory(this->pid, &this->maps_stream, &this->mem_fd);
@@ -192,7 +188,7 @@ proc_mem::proc_mem(std::string target_str, byte flags,
     maps_init(&this->m_data);
 
     //get a vector of every rw- memory region
-    populate_regions(&args->extra_region_vector, target_str);
+    populate_regions(args);
 
     return;
 }

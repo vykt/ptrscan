@@ -15,7 +15,8 @@
 class ui_term : public ui_base {
 
     public:
-        virtual int clarify_pid(name_pid * n_pid);
+        virtual void report_exception(const std::exception& e);
+        virtual pid_t clarify_pid(name_pid * n_pid);
 
 };
 

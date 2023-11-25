@@ -1,0 +1,16 @@
+message(STATUS "entering: ${CMAKE_CURRENT_SOURCE_DIR}")
+
+#add sources
+set(SOURCES_PTRSCAN 
+    ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp 
+    ${CMAKE_CURRENT_SOURCE_DIR}/args.cpp 
+    ${CMAKE_CURRENT_SOURCE_DIR}/proc_mem.cpp 
+    ${CMAKE_CURRENT_SOURCE_DIR}/ui_term.cpp 
+    PARENT_SCOPE)
+
+set(HEADERS_PTRSCAN
+    ${CMAKE_CURRENT_SOURCE_DIR}/args.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/proc_mem.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/ui_base.h 
+    ${CMAKE_CURRENT_SOURCE_DIR}/ui_term.h 
+    PARENT_SCOPE)

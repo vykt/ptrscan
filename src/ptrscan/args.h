@@ -1,10 +1,24 @@
 #ifndef ARGS_H
 #define ARGS_H
 
+#include <string>
+#include <vector>
+
+#include <libpwu.h>
+
 #include "ui_base.h"
 
 
-int process_extra_static_regions(args_struct * args, char * regions);
-int process_args(int argc, char ** argv, args_struct * args);
+typedef struct {
+
+    std::string target_str;
+    byte ui_type;
+    uintptr_t ptr_lookback;
+    unsigned int levels;
+    std::vector<static_region> extra_region_vector;
+
+} args_struct;
+
+void process_args(int argc, char ** argv, args_struct * args);
 
 #endif
