@@ -34,12 +34,12 @@ void process_extra_static_regions(args_struct * args, char * regions) {
     do {
 
         //get lookahead pointers
-        lookahead_comma = strrchr(next_region_str, ',');
+        lookahead_comma = strchr(next_region_str, ',');
         if (lookahead_comma == NULL) {
             throw std::runtime_error(exception_str[0]);
         }
 
-        lookahead_slash = strrchr(next_region_str, ':');
+        lookahead_slash = strchr(next_region_str, ':');
 
         //check if next_region_str doesn't have a comma 
         if (lookahead_slash != NULL && lookahead_comma > lookahead_slash) {
@@ -48,25 +48,29 @@ void process_extra_static_regions(args_struct * args, char * regions) {
 
         //build temp_region
         temp_region.pathname.assign(next_region_str, 
-                                    lookahead_comma - next_region_str - 1);
+                                    lookahead_comma - next_region_str);
 
-        temp_region.skip = atoi(lookahead_comma);
+        temp_region.skip = atoi(lookahead_comma + 1);
         temp_region.skipped = 0;
 
         //add temp region
         args->extra_region_vector.insert(args->extra_region_vector.end(), temp_region);
 
-    } while((next_region_str = strrchr(next_region_str, ':')) != nullptr);
+    //while there are extra regions left to process
+    } while((next_region_str = 
+            (lookahead_slash == NULL) ? NULL : lookahead_slash + 1) != NULL);
 }
 
 
 
 void process_args(int argc, char ** argv, args_struct * args) {
 
-    const char * exception_str[3] = {
-        "process_args: no argument provided for -p --ptr-lookback",
-        "process_args: no argument provided for -l --levels",
-        "process_args: no argument provided for -s --extra-static-regions"
+    const char * exception_str[4] = {
+        "process_args: use: -p <lookback:int> --ptr-lookback=<lookback:int>",
+        "process_args: use: -l <depth> --levels=<depth>",
+        "process_args: use: -s <name:str>,<skip:int> \
+--extra-static-regions=<name:str>,<skip:int>:<...>",
+        "process_args: use: ptrscan [flags] <target_name>"
     };
 
     //defined cmdline options
@@ -84,6 +88,8 @@ void process_args(int argc, char ** argv, args_struct * args) {
 
     //set default UI type
     args->ui_type = UI_TERM;
+    args->ptr_lookback = 1000;
+    args->levels = 5;
 
     //TODO check all of these type conversions are correct, they likely arent TODO
 
@@ -102,27 +108,34 @@ void process_args(int argc, char ** argv, args_struct * args) {
                 break;
 
             case 'p': //pointer lookback
+                //check for null
                 if (optarg == nullptr) {
-                    std::cerr << "use: -p <limit:uint> --ptr-lookback=<limit:uint>"
-                              << std::endl;
                     throw std::runtime_error(exception_str[0]);
                 }
-                args->ptr_lookback = (uintptr_t) atol(optarg);
+                //try to convert to address int
+                try {
+                    args->ptr_lookback = (uintptr_t) std::stoll(optarg);
+                } catch (std::exception &e) {
+                    throw std::runtime_error(exception_str[0]);
+                }
                 break;
             
             case 'l': //depth level
+                //check for null
                 if (optarg == nullptr) {
-                    std::cerr << "use: -l <depth:uint> --levels=<depth:uint>"
-                              << std::endl;
-                    throw std::runtime_error(exception_str[0]);
+                    throw std::runtime_error(exception_str[1]);
+                }
+                //try to convert to unsigned int
+                try {
+                    args->levels = (unsigned int) std::stoi(optarg);
+                } catch(std::exception& e) {
+                    throw std::runtime_error(exception_str[1]);
                 }
                 break;
             
             case 's': //extra memory regions to treat as static
                 if (optarg == nullptr) {
-                    std::cerr << "use: -s <region> --extra-static-regions=<region>"
-                              << std::endl;
-                    throw std::runtime_error(exception_str[0]);
+                    throw std::runtime_error(exception_str[2]);
                 }
                 //process each additional static region
                 process_extra_static_regions(args, optarg);
@@ -132,8 +145,11 @@ void process_args(int argc, char ** argv, args_struct * args) {
 
     } //end opt while loop
 
-    //assign target string
-    args->target_str.assign(argv[optind]);    
+    //assign target string and check for null
+    args->target_str.assign(argv[optind]);
+    if (args->target_str == "") {
+        throw std::runtime_error(exception_str[3]);
+    }
 
     return;
 }

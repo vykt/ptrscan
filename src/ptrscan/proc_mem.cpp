@@ -23,7 +23,6 @@ void proc_mem::fetch_pid(args_struct * args, ui_base * ui) {
     };
 
     int ret;
-    pid_t pid;
 
     //initialise name_pid structure
     name_pid n_pid;
@@ -44,14 +43,13 @@ void proc_mem::fetch_pid(args_struct * args, ui_base * ui) {
         case 1:
             break;
         default:
-            pid = ui->clarify_pid(&n_pid);
+            this->pid = ui->clarify_pid(&n_pid);
             break;
     }
 
     ret = del_name_pid(&n_pid);
     //not worth exception on fail
 
-    this->pid = pid;
     return;
 }
 
@@ -86,7 +84,7 @@ inline void proc_mem::add_static(args_struct * args, maps_entry * m_entry) {
     int ret;
     static_region * temp_region;
 
-    const char * name_substring = strrchr((const char *) m_entry->pathname, '/');
+    const char * name_substring = strrchr((const char *) m_entry->pathname, '/') + 1;
 
     //for every static region
     for (unsigned int i = 0; i < args->extra_region_vector.size(); ++i) {
@@ -139,7 +137,7 @@ void proc_mem::populate_regions(args_struct * args) {
         }
 
         //test for read & write permissions
-        if ((m_entry->perms & 0x02) && (m_entry->perms & 0x04)) {
+        if ((m_entry->perms & 0x01) && (m_entry->perms & 0x02)) {
             this->rw_regions_vector.insert(this->rw_regions_vector.end(), m_entry);
         } else {
             continue;
