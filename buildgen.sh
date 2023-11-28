@@ -7,5 +7,4 @@
 
 rm -rf build 
 mkdir build && cd build
-#cmake -G "Unix Makefiles" ../src
-cmake -D"BUILD_TYPE=DEBUG" -G "Unix Makefiles" ../src
+cmake -G "Unix Makefiles" ../src

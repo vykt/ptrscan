@@ -14,6 +14,8 @@
 #include "ui_base.h"
 
 
+//TODO fuzz me
+
 
 void process_extra_static_regions(args_struct * args, char * regions) {
 
@@ -88,13 +90,12 @@ void process_args(int argc, char ** argv, args_struct * args) {
 
     //set default UI type
     args->ui_type = UI_TERM;
-    args->ptr_lookback = 1000;
+    args->ptr_lookback = 0x400;
     args->levels = 5;
 
-    //TODO check all of these type conversions are correct, they likely arent TODO
-
     //option processing while loop
-    while((opt = getopt_long(argc, argv, "tnp:l:s:", long_opts, &opt_index)) != -1) {
+    while((opt = getopt_long(argc, argv, "tnp:l:s:", long_opts, &opt_index)) != -1
+          && opt != 0) {
 
         //determine parsed argument
         switch (opt) {
@@ -146,10 +147,10 @@ void process_args(int argc, char ** argv, args_struct * args) {
     } //end opt while loop
 
     //assign target string and check for null
-    args->target_str.assign(argv[optind]);
-    if (args->target_str == "") {
+    if (argv[optind] == 0) {
         throw std::runtime_error(exception_str[3]);
     }
+    args->target_str.assign(argv[optind]);
 
     return;
 }

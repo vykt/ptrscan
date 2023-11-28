@@ -1,4 +1,6 @@
--toggle ui mode
--max pointer lookback
--max levels
--additional static regions (pathname & skip)
+-t --ui-term      : -toggle ui mode
+-n --ui-ncurses   : -max pointer lookback
+-p --ptr-lookback : -max levels
+-l --levels       : -additional static regions (pathname & skip)
+
+-s <name,skip:[...]> --extra-static-regions=<name,skip:[...]>

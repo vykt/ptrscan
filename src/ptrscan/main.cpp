@@ -28,6 +28,7 @@ int main(int argc, char ** argv) {
         process_args(argc, argv, &args);
     } catch (const std::runtime_error & e) {
         std::cerr << e.what() << std::endl; //only handle ui exception this way
+        return -1;
     }
 
     //instantiate ui
@@ -43,6 +44,7 @@ int main(int argc, char ** argv) {
         p_mem.init_proc_mem(&args, ui);
     } catch (const std::runtime_error& e) {
         ui->report_exception(e);
+        return -1;
     }
 
     //TODO DEBUG: dump internal state

@@ -17,6 +17,10 @@
  *  print to stderr & don't go through UI class (ncurses for debugging? :p)
  */
 
+/*
+ *  the odd spacing in the std::cerr's is to align the values
+ */
+
 //dump non-tree structures
 void dump_structures(args_struct * args, proc_mem * p_mem) {
 
@@ -55,41 +59,42 @@ void dump_structures(args_struct * args, proc_mem * p_mem) {
 
     //dump args structure
     std::cerr << "[DEBUG] --- (args_struct args) --- CONTENTS:\n";
-    std::cerr << a_mbr[0] << " : " << args->target_str << '\n'
-              << a_mbr[1] << " : " << args->ui_type << '\n'
+    std::cerr << a_mbr[0] << "   : " << args->target_str << '\n'
+              << a_mbr[1] << "      : " << args->ui_type << '\n'
               << a_mbr[2] << " : 0x" << std::hex << args->ptr_lookback << '\n'
-              << a_mbr[3] << " : " << args->levels << '\n'
+              << a_mbr[3] << "       : " << args->levels << '\n'
               << " --- " << a_mbr[4] << ": \n";
     
     //dump args.extra_static_vector
-    for (int i = 0; i < args->extra_region_vector.size(); ++i) {
+    for (unsigned int i = 0; i < args->extra_region_vector.size(); ++i) {
         std::cerr << '\n' << '\t' 
                   << "[DEBUG] --- (" << a_mbr[4] << ")[" << i << "]:\n";
         std::cerr << '\t' << sr_mbr[0] << " : " 
                   << args->extra_region_vector[i].pathname << '\n'
-                  << '\t' << sr_mbr[1] << " : "
+                  << '\t' << sr_mbr[1] << "     : "
                   << args->extra_region_vector[i].skip << '\n'
-                  << '\t' << sr_mbr[2] << " : "
+                  << '\t' << sr_mbr[2] << "  : "
                   << args->extra_region_vector[i].skipped << '\n';
     } //end for
     
     //dump p_mem part 1
     std::cerr << '\n' << "[DEBUG] --- (proc_mem p_mem) --- CONTENTS:\n";
-    std::cerr << pm_mbr[0] << " : " << p_mem->pid << '\n'
-              << pm_mbr[1] << " : " << p_mem->mem_fd << '\n'
-              << pm_mbr[2] << " : " << (uintptr_t) p_mem->maps_stream << '\n'
+    std::cerr << pm_mbr[0] << "         : " <<  std::dec << p_mem->pid << '\n'
+              << pm_mbr[1] << "      : " << p_mem->mem_fd << '\n'
+              << pm_mbr[2] << " : 0x" 
+                           << std::hex << (uintptr_t) p_mem->maps_stream << '\n'
               << " --- " << pm_mbr[3] << ": \n";
 
     //dump std::vector<maps_entry *> p_mem.rw_regions_vector;
-    for (int i = 0; i < p_mem->rw_regions_vector.size(); ++i) {
+    for (unsigned int i = 0; i < p_mem->rw_regions_vector.size(); ++i) {
 
         std::cerr << '\n' << '\t'
                   << "[DEBUG] --- (" << pm_mbr[3] << ")[" << i << "]:\n";
-        std::cerr << '\t' << me_mbr[0] << " : " 
+        std::cerr << '\t' << me_mbr[0] << "   : " 
                   << p_mem->rw_regions_vector[i]->pathname << '\n'
-                  << '\t' << me_mbr[1] << " : "
+                  << '\t' << me_mbr[1] << "      : "
                   << (unsigned int) p_mem->rw_regions_vector[i]->perms << '\n'
-                  << '\t' << me_mbr[2] << " : "
+                  << '\t' << me_mbr[2] << " : 0x"
                   << (uintptr_t) p_mem->rw_regions_vector[i]->start_addr << '\n'
                   << '\t' << me_mbr[3] << " : "
                   << (uintptr_t) p_mem->rw_regions_vector[i]->end_addr << '\n';
@@ -99,17 +104,17 @@ void dump_structures(args_struct * args, proc_mem * p_mem) {
     std::cerr << '\n' << " --- " << pm_mbr[4] << ": \n";
 
     //dump std::vector<maps_entry *> p_mem.static_regions_vector;
-    for (int i = 0; i < p_mem->static_regions_vector.size(); ++i) {
+    for (unsigned int i = 0; i < p_mem->static_regions_vector.size(); ++i) {
     
         std::cerr << '\n' << '\t'
                   << "[DEBUG] --- (" << pm_mbr[4] << ")[" << i << "]:\n";
-        std::cerr << '\t' << me_mbr[0] << " : " 
+        std::cerr << '\t' << me_mbr[0] << "   : " 
                   << p_mem->static_regions_vector[i]->pathname << '\n'
-                  << '\t' << me_mbr[1] << " : "
+                  << '\t' << me_mbr[1] << "      : "
                   << (unsigned int) p_mem->static_regions_vector[i]->perms << '\n'
-                  << '\t' << me_mbr[2] << " : "
+                  << '\t' << me_mbr[2] << " : 0x"
                   << (uintptr_t) p_mem->static_regions_vector[i]->start_addr << '\n'
-                  << '\t' << me_mbr[3] << " : "
+                  << '\t' << me_mbr[3] << "   : 0x"
                   << (uintptr_t) p_mem->static_regions_vector[i]->end_addr << '\n';
 
     } //end for
