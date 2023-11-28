@@ -1,10 +1,16 @@
 #include <iostream>
 #include <stdexcept>
 
+#include <linux/limits.h>
+
 #include "ui_base.h"
 #include "ui_term.h"
 #include "args.h"
 #include "proc_mem.h"
+
+#ifdef DEBUG
+#include "debug.h"
+#endif
 
 //DEBUG INCLUDES
 #include <cstdio>
@@ -38,6 +44,11 @@ int main(int argc, char ** argv) {
     } catch (const std::runtime_error& e) {
         ui->report_exception(e);
     }
+
+    //TODO DEBUG: dump internal state
+    #ifdef DEBUG
+    dump_structures(&args, &p_mem);
+    #endif
 
     std::cout << "press enter to terminate." << std::endl;
     getchar();

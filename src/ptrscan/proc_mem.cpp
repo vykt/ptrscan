@@ -85,6 +85,7 @@ inline void proc_mem::add_static(args_struct * args, maps_entry * m_entry) {
     static_region * temp_region;
 
     const char * name_substring = strrchr((const char *) m_entry->pathname, '/') + 1;
+    if (name_substring == (char *) 1) name_substring = m_entry->pathname;
 
     //for every static region
     for (unsigned int i = 0; i < args->extra_region_vector.size(); ++i) {
