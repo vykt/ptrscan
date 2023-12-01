@@ -1,6 +1,10 @@
--t --ui-term      : -toggle ui mode
+-c --ui-term      : -toggle ui mode
 -n --ui-ncurses   : -max pointer lookback
 -p --ptr-lookback : -max levels
 -l --levels       : -additional static regions (pathname & skip)
+-q --aligned      : -scan for pointers aligned on 4/8 byte boundaries
+-u --unaligned    : -scan for pointers on unaligned boundaries (slow)
+-t --threads      : -specify number of cores to use
+-a --target-addr  : -specify address being pointer scanned for
 
 -s <name,skip:[...]> --extra-static-regions=<name,skip:[...]>

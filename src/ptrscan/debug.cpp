@@ -7,7 +7,7 @@
 #include "args.h"
 #include "proc_mem.h"
 
-#define ARGS_MEMBERS 5
+#define ARGS_MEMBERS 7
 #define STATIC_REGION_MEMBERS 3
 #define PROC_MEM_MEMBERS 5   //dont look at maps_data
 #define MAPS_ENTRY_MEMBERS 4 //ignore caves member
@@ -28,8 +28,10 @@ void dump_structures(args_struct * args, proc_mem * p_mem) {
     const char * a_mbr[ARGS_MEMBERS] = {
         "target_str",         //std::string
         "ui_type",            //byte
+        "aligned",            //bool
         "ptr_lookback",       //uintptr_t
         "levels",             //unsigned int
+        "num_threads",        //unsigned int
         "extra_region_vector" //std::vector<static_region>
     };
 
@@ -60,15 +62,17 @@ void dump_structures(args_struct * args, proc_mem * p_mem) {
     //dump args structure
     std::cerr << "[DEBUG] --- (args_struct args) --- CONTENTS:\n";
     std::cerr << a_mbr[0] << "   : " << args->target_str << '\n'
-              << a_mbr[1] << "      : " << args->ui_type << '\n'
-              << a_mbr[2] << " : 0x" << std::hex << args->ptr_lookback << '\n'
-              << a_mbr[3] << "       : " << args->levels << '\n'
-              << " --- " << a_mbr[4] << ": \n";
+              << a_mbr[1] << "      : " << (unsigned int) args->ui_type << '\n'
+              << a_mbr[2] << "      : " << args->aligned << '\n'
+              << a_mbr[3] << " : 0x" << std::hex << args->ptr_lookback << '\n'
+              << a_mbr[4] << "       : " << std::dec << args->levels << '\n'
+              << a_mbr[5] << "       : " << args->num_threads << '\n'
+              << " --- " << a_mbr[6] << ": \n";
     
     //dump args.extra_static_vector
     for (unsigned int i = 0; i < args->extra_region_vector.size(); ++i) {
         std::cerr << '\n' << '\t' 
-                  << "[DEBUG] --- (" << a_mbr[4] << ")[" << i << "]:\n";
+                  << "[DEBUG] --- (" << a_mbr[6] << ")[" << i << "]:\n";
         std::cerr << '\t' << sr_mbr[0] << " : " 
                   << args->extra_region_vector[i].pathname << '\n'
                   << '\t' << sr_mbr[1] << "     : "
@@ -96,7 +100,7 @@ void dump_structures(args_struct * args, proc_mem * p_mem) {
                   << (unsigned int) p_mem->rw_regions_vector[i]->perms << '\n'
                   << '\t' << me_mbr[2] << " : 0x"
                   << (uintptr_t) p_mem->rw_regions_vector[i]->start_addr << '\n'
-                  << '\t' << me_mbr[3] << " : "
+                  << '\t' << me_mbr[3] << " : 0x"
                   << (uintptr_t) p_mem->rw_regions_vector[i]->end_addr << '\n';
     } //end for
 

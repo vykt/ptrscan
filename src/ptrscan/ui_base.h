@@ -7,10 +7,6 @@
 #include <libpwu.h>
 
 
-#define UI_TERM 0
-#define UI_NCURSES 1
-
-
 //additional region to treat as static in addition to .bss & [stack]
 typedef struct {
 

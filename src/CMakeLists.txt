@@ -23,9 +23,9 @@ target_compile_options(example_proc PUBLIC -ggdb -O0 -Wall)
 #ptrscan options
 target_compile_features(scan PUBLIC cxx_std_14)
 target_compile_options(scan PUBLIC -ggdb -O0 -Wall)
-target_link_options(scan PUBLIC -lpwu)
+target_link_options(scan PUBLIC -lpwu -lpthread)
 
 #ptrscan debug options
 target_compile_features(scan_debug PUBLIC cxx_std_14)
 target_compile_options(scan_debug PUBLIC -D DEBUG -ggdb -O0 -Wall)
-target_link_options(scan_debug PUBLIC -lpwu)
+target_link_options(scan_debug PUBLIC -lpwu -lpthread)

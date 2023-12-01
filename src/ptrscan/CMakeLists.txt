@@ -7,6 +7,8 @@ set(SOURCES_PTRSCAN
     ${CMAKE_CURRENT_SOURCE_DIR}/proc_mem.cpp 
     ${CMAKE_CURRENT_SOURCE_DIR}/ui_term.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/debug.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/mem_tree.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/threads.cpp
     PARENT_SCOPE)
 
 set(HEADERS_PTRSCAN
@@ -15,4 +17,6 @@ set(HEADERS_PTRSCAN
     ${CMAKE_CURRENT_SOURCE_DIR}/ui_base.h 
     ${CMAKE_CURRENT_SOURCE_DIR}/ui_term.h
     ${CMAKE_CURRENT_SOURCE_DIR}/debug.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/mem_tree.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/threads.h
     PARENT_SCOPE)

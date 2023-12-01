@@ -17,8 +17,11 @@
 //TODO fuzz me
 
 
-void process_extra_static_regions(args_struct * args, char * regions) {
+//process complex extra static regions argument (-s, --extra-static-regions)
+inline void process_extra_static_regions(args_struct * args, char * regions,
+                                         const char * exception_str_) {
 
+    //exception(s) for incorrect internal format of static regions
     const char * exception_str[1] {
         "process_extra_static_regions: invalid static region format."
     };
@@ -28,6 +31,12 @@ void process_extra_static_regions(args_struct * args, char * regions) {
     char * lookahead_slash;
 
     static_region temp_region;
+
+
+    //throw exception if no argument passed
+    if (optarg == nullptr) {
+        throw std::runtime_error(exception_str_);
+    }
 
     //init
     next_region_str = regions;
@@ -64,24 +73,50 @@ void process_extra_static_regions(args_struct * args, char * regions) {
 }
 
 
+//process integer arguments 
+inline uintptr_t process_int_argument(const char * exception_str) {
+
+    uintptr_t temp;
+    
+    //check for null
+    if (optarg == nullptr) {
+        throw std::runtime_error(exception_str);
+    }
+
+    //try to convert to unsigned int
+    try {
+        temp = std::stol(optarg);
+    } catch(std::exception &e) {
+        throw std::runtime_error(exception_str);
+    }
+
+    return temp;
+}
+
 
 void process_args(int argc, char ** argv, args_struct * args) {
 
-    const char * exception_str[4] = {
+    const char * exception_str[6] = {
         "process_args: use: -p <lookback:int> --ptr-lookback=<lookback:int>",
         "process_args: use: -l <depth> --levels=<depth>",
         "process_args: use: -s <name:str>,<skip:int> \
 --extra-static-regions=<name:str>,<skip:int>:<...>",
+        "process_args: use: -t <thread_num> --threads=<thread_num>",
+        "process_args: use: -a <addr> --target-addr=<addr>",
         "process_args: use: ptrscan [flags] <target_name>"
     };
 
     //defined cmdline options
     struct option long_opts[] = {
-        {"ui-term", no_argument, nullptr, 't'},
+        {"ui-term", no_argument, nullptr, 'c'},
         {"ui-ncurses", no_argument, nullptr, 'n'},
         {"ptr-lookback", required_argument, nullptr, 'p'},
         {"levels", required_argument, nullptr, 'l'},
         {"extra-static-regions", required_argument, NULL, 's'},
+        {"aligned", no_argument, NULL, 'q'},
+        {"unaligned", no_argument, NULL, 'u'},
+        {"threads", required_argument, NULL, 't'},
+        {"target-addr", required_argument, NULL, 'a'},
         {0,0,0,0}
     };
 
@@ -91,16 +126,18 @@ void process_args(int argc, char ** argv, args_struct * args) {
     //set default UI type
     args->ui_type = UI_TERM;
     args->ptr_lookback = 0x400;
+    args->target_addr = 0;
     args->levels = 5;
+    args->aligned = true;
 
     //option processing while loop
-    while((opt = getopt_long(argc, argv, "tnp:l:s:", long_opts, &opt_index)) != -1
+    while((opt = getopt_long(argc, argv, "cnp:l:s:qut:a:", long_opts, &opt_index)) != -1
           && opt != 0) {
 
         //determine parsed argument
         switch (opt) {
 
-            case 't': //terminal UI
+            case 'c': //terminal UI
                 args->ui_type = UI_TERM;
                 break;
 
@@ -109,46 +146,43 @@ void process_args(int argc, char ** argv, args_struct * args) {
                 break;
 
             case 'p': //pointer lookback
-                //check for null
-                if (optarg == nullptr) {
-                    throw std::runtime_error(exception_str[0]);
-                }
-                //try to convert to address int
-                try {
-                    args->ptr_lookback = (uintptr_t) std::stoll(optarg);
-                } catch (std::exception &e) {
-                    throw std::runtime_error(exception_str[0]);
-                }
+                args->ptr_lookback = 
+                    (uintptr_t) process_int_argument(exception_str[0]);
                 break;
             
             case 'l': //depth level
-                //check for null
-                if (optarg == nullptr) {
-                    throw std::runtime_error(exception_str[1]);
-                }
-                //try to convert to unsigned int
-                try {
-                    args->levels = (unsigned int) std::stoi(optarg);
-                } catch(std::exception& e) {
-                    throw std::runtime_error(exception_str[1]);
-                }
+                args->levels = (unsigned int) process_int_argument(exception_str[1]);
                 break;
             
             case 's': //extra memory regions to treat as static
-                if (optarg == nullptr) {
-                    throw std::runtime_error(exception_str[2]);
-                }
-                //process each additional static region
-                process_extra_static_regions(args, optarg);
+                process_extra_static_regions(args, optarg, exception_str[2]);
+                break;
+
+            case 'q': //aligned pointer scan
+                args->aligned = SCAN_ALIGNED;
+                break;
+
+            case 'u': //unaligned pointer scan
+                args->aligned = SCAN_UNALIGNED;
+                break;
+
+            case 't': //number of threads
+                args->num_threads = 
+                    (unsigned int) process_int_argument(exception_str[3]);
+                break;
+
+            case 'a': //target address
+                args->target_addr = (uintptr_t) process_int_argument(exception_str[4]); 
                 break;
 
         } //end switch
 
     } //end opt while loop
 
+
     //assign target string and check for null
     if (argv[optind] == 0) {
-        throw std::runtime_error(exception_str[3]);
+        throw std::runtime_error(exception_str[5]);
     }
     args->target_str.assign(argv[optind]);
 
