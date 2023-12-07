@@ -2,11 +2,14 @@
 #define MEM_TREE_H
 
 #include <vector>
+#include <list>
 
 #include <cstdint>
 
+#include <libpwu.h>
 #include <pthread.h>
 
+#include "proc_mem.h"
 
 /*
  *   Unlike UI part of the project, these classes use two stage initialisation to avoid
@@ -29,18 +32,17 @@ class mem_node {
 
     //attributes
     public:
-    const unsigned int id;
+    unsigned int id;
+    int static_regions_index; //-1 if not static
     
-    private:
-    bool is_static;
-    uintptr_t node_addr;
-    mem_node * parent_node;
-    std::vector<mem_node> subnode_vector;
+    uintptr_t node_addr;                  //literal address of this node
+    mem_node * parent_node;               //parents
+    std::vector<mem_node> subnode_vector; //children
 
 
     //methods
     public:
-    mem_node(); //TODO finish constructor
+    mem_node(uintptr_t node_addr, mem_node * parent_node, proc_mem * p_mem);
 };
 
 
@@ -48,13 +50,14 @@ class mem_node {
 class mem_tree {
 
     //attributes
-    private:
-    std::vector<std::vector<mem_node *>> levels;
-    pthread_mutex_t m_lock;
+    public:
+    std::vector<std::list<mem_node *>> * levels;
+    const mem_node * root_node;
 
     //methods
     public:
-    mem_tree(); //TODO finish constructor
+    mem_tree(args_struct * args, proc_mem * p_mem);
+    ~mem_tree();
 };
 
 

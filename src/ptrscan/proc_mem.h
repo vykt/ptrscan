@@ -21,7 +21,6 @@
 //region memory permissions mask
 
 
-
 //target process memory class
 class proc_mem {
 
