@@ -95,8 +95,12 @@ int main(int argc, char ** argv) {
     //STAGE II - TREE GEN
 
     //instantiate pointer map tree
-    m_tree = new mem_tree(&args, &p_mem);
-
+    try {
+        m_tree = new mem_tree(&args, &p_mem);
+    } catch (std::runtime_error& e) {
+        ui->report_exception(e);
+        return -1;
+    }
 
     //scan tree
     try {

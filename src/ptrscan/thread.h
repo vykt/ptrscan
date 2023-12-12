@@ -9,7 +9,11 @@
 #include <pthread.h>
 
 #include "args.h"
+#include "ui_base.h"
 #include "mem_tree.h"
+
+
+#define READ_BUF_SIZE 0x1000 //TODO maybe set to sizeof(memory page) later
 
 
 //one of the regions a thread is set to scan
@@ -41,7 +45,6 @@ class thread {
     std::vector<parent_range> * parent_range_vector; //points to thread_ctrl member 
 
     uintptr_t current_addr;
-    bool finished_level;
 
     public:
     pthread_t id;                            //accessed internally frequently
@@ -49,13 +52,15 @@ class thread {
     
 
     //methods
+    private:
+    int addr_parent_compare(uintptr_t addr, args_struct * args);
+
     public:
     thread(pthread_barrier_t * level_barrier,
            std::vector<parent_range> * parent_range_vector);
-    int thread_main(args_struct * args);
+    void thread_main(args_struct * args, proc_mem * p_mem, mem_tree * m_tree);
 
     void reset_current_addr();
-    int confirm_finished_level();  //fail if not yet finished, reset if finished
     
 };
 
@@ -67,6 +72,7 @@ typedef struct {
     args_struct * args;
     proc_mem * p_mem;
     mem_tree * m_tree;
+    ui_base * ui;
 
 } thread_arg;
 

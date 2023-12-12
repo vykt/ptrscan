@@ -20,6 +20,11 @@
 #define STRTYPE_LLONG 2
 
 
+/*
+ *  In the future, consider allowing the user to specify a custom offset, probably
+ *  as an exponent of 2.
+ */
+
 typedef struct {
 
     std::string target_str;

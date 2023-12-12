@@ -297,17 +297,22 @@ void thread_ctrl::end_level() {
 //wait for all threads to terminate
 void thread_ctrl::wait_thread_terminate() {
 
-    const char * exception_str[1] {
-        "thread_ctrl -> wait_thread_terminate: pthread_join() failed to join threads."
+    const char * exception_str[2] {
+        "thread_ctrl -> wait_thread_terminate: pthread_join() failed to join threads.",
+        "thread_ctrl -> wait_thread_terminate: pthread_join() thread returned bad_ret."
     };
 
     int ret;
+    int * thread_ret;
 
     //for every thread
     for (int i = 0; i < this->thread_vector.size(); ++i) {
-        ret = pthread_join(this->thread_vector[i].id, NULL);
+        ret = pthread_join(this->thread_vector[i].id, (void **) &thread_ret);
         if (ret != 0) {
             throw std::runtime_error(exception_str[0]);
+        }
+        if (*thread_ret == -1) {
+            throw std::runtime_error(exception_str[1]);
         }
     } //end for 
 }

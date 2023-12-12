@@ -11,15 +11,14 @@
 
 #include "proc_mem.h"
 
-/*
- *   Unlike UI part of the project, these classes use two stage initialisation to avoid
- *   dealing with the performance overhead of exceptions should an object fail to 
- *   instantialise.
- */
 
 /*
  *   We need root -> leaf traversal for construction, and leaf -> root traversal for 
  *   using the tree.
+ */
+
+/*
+ *   The mem_node should probably be a struct.
  */
 
 /* 
@@ -37,7 +36,7 @@ class mem_node {
     
     uintptr_t node_addr;                  //literal address of this node
     mem_node * parent_node;               //parents
-    std::vector<mem_node> subnode_vector; //children
+    std::list<mem_node> subnode_list;     //children
 
 
     //methods
@@ -50,6 +49,9 @@ class mem_node {
 class mem_tree {
 
     //attributes
+    private:
+    pthread_mutex_t write_mutex;
+
     public:
     std::vector<std::list<mem_node *>> * levels;
     const mem_node * root_node;
@@ -58,6 +60,9 @@ class mem_tree {
     public:
     mem_tree(args_struct * args, proc_mem * p_mem);
     ~mem_tree();
+
+    void add_node(uintptr_t addr, mem_node * parent_node, 
+                  unsigned int level, proc_mem * p_mem);
 };
 
 
