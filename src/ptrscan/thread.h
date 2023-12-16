@@ -40,7 +40,11 @@ typedef struct {
 class thread {
 
     //attributes
+    #ifdef DEBUG
+    public:
+    #else
     private:
+    #endif
     pthread_barrier_t * level_barrier;               //points to thread_ctrl member
     std::vector<parent_range> * parent_range_vector; //points to thread_ctrl member 
 

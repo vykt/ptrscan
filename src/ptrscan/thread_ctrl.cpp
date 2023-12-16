@@ -229,8 +229,8 @@ void thread_ctrl::prepare_level(args_struct * args, proc_mem * p_mem,
     level_list = &(*m_tree->levels)[this->current_level-1];
 
     //for every member of current level list
-    for (std::list<mem_node *>::iterator it = (*level_list).begin();
-         it != (*level_list).end(); ++it) {
+    for (std::list<mem_node *>::iterator it = level_list->begin();
+         it != level_list->end(); ++it) {
 
         //assign address of this node
         temp_parent_range.end_addr = (*it)->node_addr;

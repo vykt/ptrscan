@@ -21,32 +21,34 @@
 
 
 //generate pointer tree
-void threaded_scan(args_struct * args, proc_mem * p_mem, mem_tree * m_tree,
-                     ui_base * ui) {
-
-    thread_ctrl t_ctrl;
+void threaded_scan(args_struct * args, proc_mem * p_mem, thread_ctrl * t_ctrl,
+                   mem_tree * m_tree, ui_base * ui) {
   
     //TODO USE UI TO REPORT PROGRESS OF SCAN
 
     //initialise the thread controller
-    t_ctrl.init(args, p_mem, m_tree);
+    t_ctrl->init(args, p_mem, m_tree);
 
     //for every level
     for (int i = 1; i < args->levels; ++i) {
         
         //prepare the next level
-        t_ctrl.prepare_level(args, p_mem, m_tree);
+        t_ctrl->prepare_level(args, p_mem, m_tree);
 
         //start next level
-        t_ctrl.start_level();
+        t_ctrl->start_level();
 
         //end level
-        t_ctrl.end_level();
-    
+        t_ctrl->end_level();
+
+        #ifdef DEBUG
+        dump_structures_thread_level(t_ctrl, m_tree, i);
+        #endif
+
     } //end for every level
 
     //wait on threads to terminate
-    t_ctrl.wait_thread_terminate();
+    t_ctrl->wait_thread_terminate();
 }
 
 
@@ -55,6 +57,7 @@ int main(int argc, char ** argv) {
 
     args_struct args;
     proc_mem p_mem; 
+    thread_ctrl t_ctrl;
 
     ui_base * ui;
     mem_tree * m_tree;
@@ -86,11 +89,10 @@ int main(int argc, char ** argv) {
         return -1;
     }
 
-    //TODO DEBUG: dump internal state
+    //TODO DEBUG: dump internal args & libpwy memory structures state
     #ifdef DEBUG
-    dump_structures(&args, &p_mem);
+    dump_structures_init(&args, &p_mem);
     #endif
-
 
     //STAGE II - TREE GEN
 
@@ -104,7 +106,7 @@ int main(int argc, char ** argv) {
 
     //scan tree
     try {
-        threaded_scan(&args, &p_mem, m_tree, ui);
+        threaded_scan(&args, &p_mem, &t_ctrl, m_tree, ui);
     } catch (std::runtime_error& e) {
         ui->report_exception(e);
         return -1;

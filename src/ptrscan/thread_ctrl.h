@@ -14,11 +14,19 @@
 #include "proc_mem.h"
 
 
+//TODO debug, removeme
+#define DEBUG
+
+
 //thread controller, 'global state'
 class thread_ctrl {
 
     //attributes
+    #ifdef DEBUG
+    public:
+    #else
     private:
+    #endif
     std::vector<parent_range> parent_range_vector;
     std::vector<thread> thread_vector;
     pthread_barrier_t level_barrier;
