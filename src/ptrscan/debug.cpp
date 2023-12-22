@@ -78,7 +78,7 @@ void dump_structures_init(args_struct * args, proc_mem * p_mem) {
 
 
     //start dump
-    std::cerr << "*** *** *** *** *** [INIT DUMP] *** *** *** *** ***\n\n";
+    std::cerr << "\n*** *** *** *** *** [INIT DUMP] *** *** *** *** ***\n";
 
     //dump args structure
     std::cerr << "[DEBUG] --- (args_struct args) --- CONTENTS:\n";
@@ -146,39 +146,73 @@ void dump_structures_init(args_struct * args, proc_mem * p_mem) {
 }
 
 
-//dump thread control level
-void dump_structures_thread_level(thread_ctrl * t_ctrl, mem_tree * m_tree, int lvl) {
+//dump division of work between threads
+void dump_structures_thread_work(thread_ctrl * t_ctrl) {
 
-    //thread_ctrl object members
-    const char * tc_mbr[THREAD_CTRL_MEMBERS] = {
-        "current_level       : ", //unsigned int
-        "parent_range_vector",    //std::vector<parent_range>
-        "thread_vector"           //std::vector<thread>
-    };
-
-    //thread members
-    const char * t_mbr[THREAD_MEMBERS] = {
-        "id              : ", //pthread_t (some kind of integer on Linux)
-        "regions_to_scan"     //std::vector<mem_range>
-    };
-
-    //args_structure members
-    const char * pr_mbr[PARENT_RANGE_MEMBERS] = {
-        "parent_node (id) : ",   //mem_node * (unsigned int)
-        "start_addr       : 0x", //uintptr_t
-        "end_addr         : 0x"  //uintptr_t
-    };
-
-    //args_structure members
+    //mem_range members
     const char * mr_mbr[MEM_RANGE_MEMBERS] = {
         "m_entry    : 0x", //maps_entry *
         "start_addr : 0x", //uintptr_t
         "end_addr   : 0x"  //uintptr_t
     };
 
-    //args_structure members
+    //thread members
+    const char * t_mbr[THREAD_MEMBERS] = {
+        "id: ",           //pthread_t (some kind of integer on Linux)
+        "regions_to_scan" //std::vector<mem_range>
+    };
+
+    //start dump
+    std::cerr << "\n*** *** *** *** *** [THREAD WORK DUMP] *** *** *** *** ***\n";
+
+    //dump thread_ctrl.thread_vector
+    for (unsigned int i = 0; i < (unsigned int) t_ctrl->thread_vector.size(); ++i) {
+        std::cerr << '\n'
+                  << "[DEBUG] --- (thread_vector)[" << i << "]:";
+        std::cerr << t_mbr[0]
+                  << t_ctrl->thread_vector[i].id << '\n';
+
+        //dump thread_ctrl.thread_vector[i].regions_to_scan
+        for (unsigned int j = 0; 
+             j < (unsigned int) t_ctrl->thread_vector[i].regions_to_scan.size(); ++j) {
+
+            std::cerr << '\n' << '\t'
+                      << "[DEBUG] --- (" << t_mbr[1] << ")[" << j << "]:";
+            std::cerr << '\t' << mr_mbr[0]
+                      << std::hex
+                      << t_ctrl->thread_vector[i].regions_to_scan[j].m_entry << '\n'
+                      << '\t' << mr_mbr[1]
+                      << std::hex
+                      << t_ctrl->thread_vector[i].regions_to_scan[j].start_addr << '\n'
+                      << '\t' << mr_mbr[2]
+                      << std::hex
+                      << t_ctrl->thread_vector[i].regions_to_scan[j].end_addr << '\n';
+        } //end inner for
+    } //end for
+
+}
+
+
+//dump thread control level
+void dump_structures_thread_level(thread_ctrl * t_ctrl, mem_tree * m_tree, int lvl) {
+
+    //thread_ctrl object members
+    const char * tc_mbr[THREAD_CTRL_MEMBERS] = {
+        "current_level: ",        //unsigned int
+        "parent_range_vector",    //std::vector<parent_range>
+        "thread_vector"           //std::vector<thread>
+    };
+
+    //parent_range members
+    const char * pr_mbr[PARENT_RANGE_MEMBERS] = {
+        "parent_node (id) : ",   //mem_node * (unsigned int)
+        "start_addr       : 0x", //uintptr_t
+        "end_addr         : 0x"  //uintptr_t
+    };
+
+    //mem_tree members
     const char * mt_mbr[MEM_TREE_MEMBERS] = {
-        "root_node (id) : ", //const mem_node * (unsigned int)
+        "root_node (id): ",  //const mem_node * (unsigned int)
         "levels"             //std::vector<std::list<mem_node *>> * levels
     };
 
@@ -196,48 +230,26 @@ void dump_structures_thread_level(thread_ctrl * t_ctrl, mem_tree * m_tree, int l
 
 
     //start dump
-    std::cerr << "*** *** *** *** *** [THREAD LEVEL DUMP: "
+    std::cerr << "\n*** *** *** *** *** [THREAD LEVEL DUMP: "
               << lvl 
-              << "] *** *** *** *** ***\n\n";
+              << "] *** *** *** *** ***\n";
 
     //dump thread_ctrl object (and its constituent threads)
     std::cerr << "\n[DEBUG] --- (thread_ctrl t_ctrl) --- CONTENTS:\n";
     std::cerr << tc_mbr[0] << t_ctrl->current_level << '\n';
 
     //dump thread_ctrl.parent_range_vector
-    for (int i = 0; i < t_ctrl->parent_range_vector.size(); ++i) {
+    for (unsigned int i = 0; 
+         i < (unsigned int) t_ctrl->parent_range_vector.size(); ++i) {
+        
         std::cerr << '\n' << '\t'
-                  << "[DEBUG] --- (" << tc_mbr[1] << ")[" << i << "]:";
+                  << "[DEBUG] --- (" << tc_mbr[1] << ")[" << i << "]:" << '\n';
         std::cerr << '\t' << pr_mbr[0]
-                  << t_ctrl->parent_range_vector[i].parent_node->id << '\n'
+                  << std::dec << t_ctrl->parent_range_vector[i].parent_node->id << '\n'
                   << '\t' << pr_mbr[1]
                   << std::hex << t_ctrl->parent_range_vector[i].start_addr << '\n'
                   << '\t' << pr_mbr[2]
                   << std::hex << t_ctrl->parent_range_vector[i].end_addr << '\n';
-    } //end for
-
-    //dump thread_ctrl.thread_vector
-    for (int i = 0; i < t_ctrl->thread_vector.size(); ++i) {
-        std::cerr << '\n' << '\t'
-                  << "[DEBUG] --- (" << tc_mbr[2] << ")[" << i << "]:";
-        std::cerr << '\t' << t_mbr[0]
-                  << t_ctrl->thread_vector[i].id << '\n';
-
-        //dump thread_ctrl.thread_vector[i].regions_to_scan
-        for (int j = 0; j < t_ctrl->thread_vector[i].regions_to_scan.size(); ++j) {
-
-            std::cerr << '\n' << '\t' << '\t'
-                      << "[DEBUG] --- (" << t_mbr[1] << ")[" << j << "]:";
-            std::cerr << '\t' << '\t' << mr_mbr[0]
-                      << std::hex
-                      << t_ctrl->thread_vector[i].regions_to_scan[j].m_entry << '\n'
-                      << '\t' << '\t' << mr_mbr[1]
-                      << std::hex
-                      << t_ctrl->thread_vector[i].regions_to_scan[j].start_addr << '\n'
-                      << '\t' << '\t' << mr_mbr[2]
-                      << std::hex
-                      << t_ctrl->thread_vector[i].regions_to_scan[j].end_addr << '\n';
-        } //end inner for
     } //end for
 
 
@@ -251,7 +263,7 @@ void dump_structures_thread_level(thread_ctrl * t_ctrl, mem_tree * m_tree, int l
          it != level_list->end(); ++it) {
 
         std::cerr << '\n' << '\t'
-                  << "[DEBUG] --- (" << mt_mbr[1] << ")[" << lvl << "]:";
+                  << "[DEBUG] --- (" << mt_mbr[1] << ")[" << lvl << "]:" << '\n';
         std::cerr << '\t' << mn_mbr[0]
                   << std::dec << (*it)->id << '\n'
                   << '\t' << mn_mbr[1]

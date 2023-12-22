@@ -20,6 +20,7 @@
 //bootstrap function
 void * thread_bootstrap(void * arg_bootstrap) {
 
+    int good_ret = 0;
     int bad_ret = -1;
 
     //cast to correct type
@@ -29,11 +30,18 @@ void * thread_bootstrap(void * arg_bootstrap) {
     try {
         real_arg->t->thread_main(real_arg->args, real_arg->p_mem, real_arg->m_tree);
     } catch (std::runtime_error& e) {
-        real_arg->ui->report_exception(e);
+        real_arg->ui->report_exception(e); //TODO this will cause a segfault if it runs
         pthread_exit((void *) &bad_ret);
     }
 
-    return nullptr;
+    //close descriptor
+    close(real_arg->t->mem_fd);
+
+    //free arguments structure on exit
+    free(arg_bootstrap);
+
+    //exit
+    pthread_exit((void *) &good_ret);
 }
 
 
@@ -43,17 +51,16 @@ void * thread_bootstrap(void * arg_bootstrap) {
 
 //read the next buffer while allowing for unaligned pointer scanning across 
 //buffer boundaries
-size_t inline get_next_buffer_smart(byte * mem_buf, size_t read_left, 
-                                  size_t read_last, bool first_region_read,
-                                  proc_mem * p_mem) {
+ssize_t inline thread::get_next_buffer_smart(byte * mem_buf, ssize_t read_left, 
+                                            ssize_t read_last, bool first_region_read) {
 
     const char * exception_str[2] = {
         "thread -> get_next_buffer_smart: memory read into buffer failed."
         "thread -> get_next_buffer_smart: failsafe memory read into buffer failed."
     };
 
-    size_t min, max;
-    size_t read_bytes, read_bytes_failsafe, to_read, read_buf_effective_size;
+    ssize_t min, max;
+    ssize_t read_bytes, read_bytes_failsafe, to_read, read_buf_effective_size;
 
     //if first read of this region, read the entire buffer
     if (first_region_read) {
@@ -66,15 +73,14 @@ size_t inline get_next_buffer_smart(byte * mem_buf, size_t read_left,
                sizeof(uintptr_t));
         memset(mem_buf + sizeof(uintptr_t), 0, read_buf_effective_size);
     }
-    
-    
+     
     //get read target size
     min = 0;
     max = read_buf_effective_size;
     to_read = std::clamp(read_left, min, max);
 
     //read up to read_buf_effective_size bytes (if scheduler is kind)
-    read_bytes = read(p_mem->mem_fd, mem_buf, to_read);
+    read_bytes = read(this->mem_fd, mem_buf, to_read);
     if (read_bytes == -1) {
         throw std::runtime_error(exception_str[0]);
     }
@@ -90,7 +96,7 @@ size_t inline get_next_buffer_smart(byte * mem_buf, size_t read_left,
 
     //call read again to align buffer if necessary
     if (read_bytes % sizeof(uintptr_t)) {
-        read_bytes_failsafe = read(p_mem->mem_fd, mem_buf+read_bytes,
+        read_bytes_failsafe = read(this->mem_fd, mem_buf+read_bytes,
                                    read_bytes % sizeof(uintptr_t));
         if (read_bytes_failsafe == -1) {
             throw std::runtime_error(exception_str[1]);
@@ -111,7 +117,7 @@ int thread::addr_parent_compare(uintptr_t addr, args_struct * args) {
     bool eval_range;
 
     //for every parent region
-    for (int i = 0; i < this->parent_range_vector->size(); ++i) {
+    for (unsigned int i = 0; i < (unsigned int) this->parent_range_vector->size(); ++i) {
 
         //evaluate if addr falls in the range of this parent node
         eval_range = addr >= (*this->parent_range_vector)[i].start_addr
@@ -129,16 +135,6 @@ int thread::addr_parent_compare(uintptr_t addr, args_struct * args) {
 }
 
 
-//thread constructor
-thread::thread(pthread_barrier_t * level_barrier,
-               std::vector<parent_range> * parent_range_vector) {
-
-    this->level_barrier = level_barrier;
-    this->parent_range_vector = parent_range_vector;
-
-}
-
-
 //main loop for each thread
 void thread::thread_main(args_struct * args, proc_mem * p_mem, mem_tree * m_tree) {
 
@@ -149,8 +145,7 @@ void thread::thread_main(args_struct * args, proc_mem * p_mem, mem_tree * m_tree
 
     int ret, parent_index;
 
-    size_t read_left, read_last, read_total;
-    size_t min, max;
+    ssize_t read_left, read_last, read_total;
 
     uintptr_t read_addr, potential_ptr_addr;
     bool first_region_read;
@@ -168,31 +163,31 @@ void thread::thread_main(args_struct * args, proc_mem * p_mem, mem_tree * m_tree
 
 
     //for every level in the tree (start at 1, 0 is root)
-    for (int i = 1; i < args->levels; ++i) {
+    for (unsigned int i = 1; i < args->levels; ++i) {
 
         //wait for thread_ctrl->start_level()
         pthread_barrier_wait(this->level_barrier);
 
         //for every region this thread needs to scan
-        for (int j = 0; j < this->regions_to_scan.size(); ++j) {
+        for (unsigned int j = 0; j < (unsigned int) this->regions_to_scan.size(); ++j) {
 
             /*
              *  not reading with libpwu to avoid calling lseek
              */
-            
+
             //seek to start of region
-            ret = (off_t) lseek(p_mem->mem_fd, this->regions_to_scan[i].start_addr,
+            ret = (off_t) lseek(this->mem_fd, this->regions_to_scan[j].start_addr,
                                 SEEK_SET);
             if (ret == -1) {
                 throw std::runtime_error(exception_str[0]);
             }
 
             //get size of region
-            read_left = read_total = this->regions_to_scan[i].end_addr
-                                     - this->regions_to_scan[i].start_addr;
+            read_left = read_total = this->regions_to_scan[j].end_addr
+                                     - this->regions_to_scan[j].start_addr;
 
             //reset misc variables
-            read_addr = this->regions_to_scan[i].start_addr;
+            read_addr = this->regions_to_scan[j].start_addr;
             first_region_read = true;
             read_last = 0;
 
@@ -200,22 +195,15 @@ void thread::thread_main(args_struct * args, proc_mem * p_mem, mem_tree * m_tree
             while (read_left != 0) {
 
                 //get the next buffer
-                read_last = get_next_buffer_smart(mem_buf, read_left, read_last, 
-                                                  first_region_read, p_mem);
-                
-                //increment current address accordingly
-                if (first_region_read) {
-                    read_addr += read_last;
-                    first_region_read = false;
-                } else {
-                    read_addr += read_last - sizeof(uintptr_t);
-                }
+                read_last = this->get_next_buffer_smart(mem_buf, read_left, read_last, 
+                                                        first_region_read);
+                read_left -= read_last;
 
                 //for every aligned / unaligned pointer
                 for (int k = 0; k < read_last; k += buffer_increment) {
 
                     //convert value to ptr
-                    potential_ptr_addr = (uintptr_t) mem_buf + k;
+                    potential_ptr_addr = *((uintptr_t *) (mem_buf + k));
                     
                     //see if ptr points to any parent
                     parent_index = this->addr_parent_compare(potential_ptr_addr,
@@ -226,12 +214,19 @@ void thread::thread_main(args_struct * args, proc_mem * p_mem, mem_tree * m_tree
 
                     //otherwise, add new node
                     m_tree->add_node(
-                            potential_ptr_addr, 
+                            read_addr + k, 
                             (*this->parent_range_vector)[parent_index].parent_node,
                             i,
                             p_mem);
 
                 } //end for every aligned / unaligned pointer
+ 
+                //increment current address accordingly
+                if (first_region_read) {
+                    first_region_read = false;
+                }
+                read_addr += read_last;
+
             } //end while
         } //end for every region
 

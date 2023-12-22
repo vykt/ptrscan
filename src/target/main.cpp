@@ -37,6 +37,7 @@ int main() {
             game_world->enemies[i]->weapon->ammo -= 1;
         }
 
+        std::cout << "player health: " << game_world->players[0]->health << std::endl;
         std::cout << "continue (enter): ";
         std::getline(std::cin, temp);
 

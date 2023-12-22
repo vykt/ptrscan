@@ -77,15 +77,26 @@ inline void process_extra_static_regions(args_struct * args, char * regions,
 inline uintptr_t process_int_argument(const char * exception_str) {
 
     uintptr_t temp;
-    
+    char * optarg_mod;
+    int base;
+
+    optarg_mod = optarg;
+    base = 10;
+
     //check for null
     if (optarg == nullptr) {
         throw std::runtime_error(exception_str);
     }
 
+    //switch to base 16
+    if (!strncmp(optarg, "0x", 2)) {
+        base = 16;
+        optarg_mod += 2;
+    }
+
     //try to convert to unsigned int
     try {
-        temp = std::stol(optarg);
+        temp = std::stol(optarg, NULL, base);
     } catch(std::exception &e) {
         throw std::runtime_error(exception_str);
     }

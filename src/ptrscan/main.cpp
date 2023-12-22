@@ -22,15 +22,19 @@
 
 //generate pointer tree
 void threaded_scan(args_struct * args, proc_mem * p_mem, thread_ctrl * t_ctrl,
-                   mem_tree * m_tree, ui_base * ui) {
+                   mem_tree * m_tree, ui_base * ui, pid_t pid) {
   
     //TODO USE UI TO REPORT PROGRESS OF SCAN
 
     //initialise the thread controller
-    t_ctrl->init(args, p_mem, m_tree);
+    t_ctrl->init(args, p_mem, m_tree, pid);
+
+    #ifdef DEBUG
+    dump_structures_thread_work(t_ctrl);
+    #endif
 
     //for every level
-    for (int i = 1; i < args->levels; ++i) {
+    for (unsigned int i = 1; i < args->levels; ++i) {
         
         //prepare the next level
         t_ctrl->prepare_level(args, p_mem, m_tree);
@@ -106,7 +110,7 @@ int main(int argc, char ** argv) {
 
     //scan tree
     try {
-        threaded_scan(&args, &p_mem, &t_ctrl, m_tree, ui);
+        threaded_scan(&args, &p_mem, &t_ctrl, m_tree, ui, p_mem.pid);
     } catch (std::runtime_error& e) {
         ui->report_exception(e);
         return -1;

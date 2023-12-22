@@ -16,7 +16,8 @@ int check_static(uintptr_t node_addr, proc_mem * p_mem) {
     bool eval;
     
     //for every static region
-    for (int i = 0; i < p_mem->static_regions_vector.size(); ++i) {
+    for (unsigned int i = 0; 
+         i < (unsigned int) p_mem->static_regions_vector.size();  ++i) {
 
         //check if node_addr falls in range of this static region
         eval = (uintptr_t) p_mem->static_regions_vector[i]->start_addr

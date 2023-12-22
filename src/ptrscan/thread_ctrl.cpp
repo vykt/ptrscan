@@ -3,8 +3,9 @@
 #include <stdexcept>
 #include <algorithm>
 
-#include <cstdint>
+#include <cstdlib>
 #include <cstring>
+#include <cstdint>
 
 #include <libpwu.h>
 
@@ -20,11 +21,15 @@
 //get total rw- memory
 uintptr_t thread_ctrl::get_rw_mem_sum(proc_mem * p_mem) {
 
-    uintptr_t mem_sum;
+    uintptr_t mem_sum, region_size;
+
+    mem_sum = 0;
+
     //for every rw- memory segment
-    for (int i = 0; i < p_mem->rw_regions_vector.size(); ++i) {
-        mem_sum = (uintptr_t) p_mem->rw_regions_vector[i]->end_addr 
+    for (unsigned int i = 0; i < (unsigned int) p_mem->rw_regions_vector.size(); ++i) {
+        region_size = (uintptr_t) p_mem->rw_regions_vector[i]->end_addr 
                   - (uintptr_t) p_mem->rw_regions_vector[i]->start_addr;
+        mem_sum += region_size;
     } //end for
 
     return mem_sum;
@@ -56,7 +61,7 @@ void thread_ctrl::define_regions_to_scan(args_struct * args, proc_mem * p_mem,
     fwd_max = sizeof(uintptr_t);
 
     //for every thread
-    for (int i = 0; i < args->num_threads; ++i) {
+    for (unsigned int i = 0; i < args->num_threads; ++i) {
         
         //check if this is the last thread, it gets the rest of the remaining memory
         if (i == args->num_threads - 1) {
@@ -149,11 +154,19 @@ void thread_ctrl::define_regions_to_scan(args_struct * args, proc_mem * p_mem,
 // --- public
 
 //initialise thread controller & spawn threads
-void thread_ctrl::init(args_struct * args, proc_mem * p_mem, mem_tree * m_tree) {
+void thread_ctrl::init(args_struct * args, proc_mem * p_mem, 
+                       mem_tree * m_tree, pid_t pid) {
+
+    const char * exception_str[2] = { 
+        "thread_ctrl -> init: failed to malloc() thread arguments.",
+        "thread_ctrl -> init: failed to open file descriptor on proc mem for thread."
+    };
 
     int ret;
     uintptr_t mem_sum;
-    thread_arg t_arg;
+   
+    thread_arg * t_arg;
+    thread t_temp;
 
     //set current level to 0 (root node)
     this->current_level = 0;
@@ -166,25 +179,43 @@ void thread_ctrl::init(args_struct * args, proc_mem * p_mem, mem_tree * m_tree) 
     mem_sum = get_rw_mem_sum(p_mem);
 
     //instantiate thread objects
-    for (int i = 0; i < args->num_threads; ++i) {
-        this->thread_vector.push_back(thread(&this->level_barrier,
-                                             &this->parent_range_vector));
+    for (unsigned int i = 0; i < args->num_threads; ++i) {
+        
+        //setup links to controller
+        t_temp.level_barrier = &this->level_barrier;
+        t_temp.parent_range_vector = &this->parent_range_vector;
+        
+        //open file descriptor on proc mem for this thread
+        ret = open_memory(pid, NULL, &t_temp.mem_fd);
+        if (ret == -1) {
+            throw std::runtime_error(exception_str[1]);
+        }
+
+        //push new thread object
+        this->thread_vector.push_back(t_temp);
     }
 
     //define memory regions each thread will scan
     define_regions_to_scan(args, p_mem, mem_sum);
 
-    //setup thread spawn structure
-    t_arg.args = args;
-    t_arg.p_mem = p_mem;
-    t_arg.m_tree = m_tree;
-
     //spawn each thread
-    for (int i = 0; i < this->thread_vector.size(); ++i) { 
+    for (unsigned int i = 0; i < this->thread_vector.size(); ++i) { 
 
-        t_arg.t = &this->thread_vector[i];
+        //setup args structure for new thread (deallocated by thread on exit)
+        t_arg = (thread_arg *) malloc(sizeof(thread_arg));
+        if (!t_arg) {
+            throw std::runtime_error(exception_str[0]);
+        }
+
+        t_arg->args = args;
+        t_arg->p_mem = p_mem;
+        t_arg->m_tree = m_tree;
+        t_arg->t = &this->thread_vector[i];
+
+        //create thread
         ret = pthread_create(&this->thread_vector[i].id, NULL,
-                              &thread_bootstrap, (void *) &t_arg);
+                              &thread_bootstrap, (void *) t_arg);
+        //TODO check return from pthread_create
     }
 }
 
@@ -214,7 +245,7 @@ void thread_ctrl::prepare_level(args_struct * args, proc_mem * p_mem,
     this->current_level += 1;
 
     //reset current_addr for each thread
-    for (int i = 0; i < this->thread_vector.size(); ++i) {
+    for (unsigned int i = 0; i < (unsigned int) this->thread_vector.size(); ++i) {
         this->thread_vector[i].reset_current_addr();
     }
 
@@ -306,7 +337,7 @@ void thread_ctrl::wait_thread_terminate() {
     int * thread_ret;
 
     //for every thread
-    for (int i = 0; i < this->thread_vector.size(); ++i) {
+    for (unsigned int i = 0; i < (unsigned int) this->thread_vector.size(); ++i) {
         ret = pthread_join(this->thread_vector[i].id, (void **) &thread_ret);
         if (ret != 0) {
             throw std::runtime_error(exception_str[0]);
