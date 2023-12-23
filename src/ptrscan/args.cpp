@@ -127,6 +127,8 @@ void process_args(int argc, char ** argv, args_struct * args) {
         {"aligned", no_argument, NULL, 'q'},
         {"unaligned", no_argument, NULL, 'u'},
         {"threads", required_argument, NULL, 't'},
+        {"output-file", required_argument, NULL, 'w'},
+        {"input-file", required_argument, NULL, 'r'},
         {"target-addr", required_argument, NULL, 'a'},
         {0,0,0,0}
     };
@@ -142,7 +144,8 @@ void process_args(int argc, char ** argv, args_struct * args) {
     args->aligned = true;
 
     //option processing while loop
-    while((opt = getopt_long(argc, argv, "cnp:l:s:qut:a:", long_opts, &opt_index)) != -1
+    while((opt = getopt_long(argc, argv, "cnp:l:s:qut:w:r:a:", 
+           long_opts, &opt_index)) != -1 
           && opt != 0) {
 
         //determine parsed argument
@@ -180,6 +183,14 @@ void process_args(int argc, char ** argv, args_struct * args) {
             case 't': //number of threads
                 args->num_threads = 
                     (unsigned int) process_int_argument(exception_str[3]);
+                break;
+
+            case 'w': //output file
+                args->output_file.assign(optarg);
+                break;
+
+            case 'r': //input file
+                args->input_file.assign(optarg);
                 break;
 
             case 'a': //target address

@@ -34,14 +34,16 @@ class mem_node {
     unsigned int id;
     int static_regions_index; //-1 if not static
     
-    uintptr_t node_addr;                  //literal address of this node
-    mem_node * parent_node;               //parents
-    std::list<mem_node> subnode_list;     //children
+    uintptr_t node_addr;              //literal address of this node
+    uintptr_t point_addr;             //where this node points to
+    mem_node * parent_node;           //parents
+    std::list<mem_node> subnode_list; //children
 
 
     //methods
     public:
-    mem_node(uintptr_t node_addr, mem_node * parent_node, proc_mem * p_mem);
+    mem_node(uintptr_t node_addr, uintptr_t point_addr,
+             mem_node * parent_node, proc_mem * p_mem);
 };
 
 
@@ -61,7 +63,7 @@ class mem_tree {
     mem_tree(args_struct * args, proc_mem * p_mem);
     ~mem_tree();
 
-    void add_node(uintptr_t addr, mem_node * parent_node, 
+    void add_node(uintptr_t addr, uintptr_t point_addr, mem_node * parent_node, 
                   unsigned int level, proc_mem * p_mem);
 };
 

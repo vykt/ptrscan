@@ -10,6 +10,7 @@ set(SOURCES_PTRSCAN
     ${CMAKE_CURRENT_SOURCE_DIR}/mem_tree.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread_ctrl.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/serialise.cpp
     PARENT_SCOPE)
 
 set(HEADERS_PTRSCAN
@@ -21,4 +22,5 @@ set(HEADERS_PTRSCAN
     ${CMAKE_CURRENT_SOURCE_DIR}/mem_tree.h
     ${CMAKE_CURRENT_SOURCE_DIR}/thread_ctrl.h
     ${CMAKE_CURRENT_SOURCE_DIR}/thread.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/serialise.h
     PARENT_SCOPE)

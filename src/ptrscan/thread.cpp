@@ -214,7 +214,8 @@ void thread::thread_main(args_struct * args, proc_mem * p_mem, mem_tree * m_tree
 
                     //otherwise, add new node
                     m_tree->add_node(
-                            read_addr + k, 
+                            read_addr + k,
+                            potential_ptr_addr,
                             (*this->parent_range_vector)[parent_index].parent_node,
                             i,
                             p_mem);

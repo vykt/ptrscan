@@ -37,12 +37,14 @@ int check_static(uintptr_t node_addr, proc_mem * p_mem) {
 
 
 //constructor for each node
-mem_node::mem_node(uintptr_t node_addr, mem_node * parent_node, proc_mem * p_mem) {
+mem_node::mem_node(uintptr_t node_addr, uintptr_t point_addr,
+                   mem_node * parent_node, proc_mem * p_mem) {
 
     this->id = next_node_id;
     next_node_id++;
 
     this->node_addr = node_addr;
+    this->point_addr = point_addr;
     this->static_regions_index = check_static(node_addr, p_mem);
     this->parent_node = parent_node;
 }
@@ -58,7 +60,7 @@ mem_tree::mem_tree(args_struct * args, proc_mem * p_mem) {
     int ret;
 
     //create root node
-    this->root_node = new mem_node(args->target_addr, NULL, p_mem);
+    this->root_node = new mem_node(args->target_addr, 0, NULL, p_mem);
 
     //create levels vector with space for args->levels number of lists
     this->levels = new std::vector<std::list<mem_node *>>(args->levels);
@@ -85,7 +87,7 @@ mem_tree::~mem_tree() {
 
 
 //add node to tree
-void mem_tree::add_node(uintptr_t addr, mem_node * parent_node, 
+void mem_tree::add_node(uintptr_t addr, uintptr_t point_addr, mem_node * parent_node, 
                         unsigned int level, proc_mem * p_mem) {
 
     const char * exception_str[2] = {
@@ -98,7 +100,7 @@ void mem_tree::add_node(uintptr_t addr, mem_node * parent_node,
     mem_node * pushed_mem_node;
 
     //define new node
-    mem_node m_node(addr, parent_node, p_mem);
+    mem_node m_node(addr, point_addr, parent_node, p_mem);
 
     //acquire mutex to modify tree
     ret = pthread_mutex_lock(&this->write_mutex);

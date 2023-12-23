@@ -22,7 +22,7 @@
 #define PARENT_RANGE_MEMBERS 3
 #define MEM_RANGE_MEMBERS 3
 #define MEM_TREE_MEMBERS 2     //ignore write_mutex member
-#define MEM_NODE_MEMBERS 5
+#define MEM_NODE_MEMBERS 6
 
 
 /*
@@ -221,6 +221,7 @@ void dump_structures_thread_level(thread_ctrl * t_ctrl, mem_tree * m_tree, int l
         "id                   : ",   //unsigned int
         "static_regions_index : ",   //int
         "node_addr            : 0x", //node_addr
+        "point_addr           : 0x", //point_addr
         "parent_node (id)     : ",   //mem_node * (unsigned int)
         "subnode_list (size)  : "    //std::list<mem_node> (int)
     };
@@ -271,8 +272,10 @@ void dump_structures_thread_level(thread_ctrl * t_ctrl, mem_tree * m_tree, int l
                   << '\t' << mn_mbr[2]
                   << std::hex << (*it)->node_addr << '\n'
                   << '\t' << mn_mbr[3]
-                  << std::dec << (*it)->parent_node->id << '\n'
+                  << std::hex << (*it)->point_addr << '\n'
                   << '\t' << mn_mbr[4]
+                  << std::dec << (*it)->parent_node->id << '\n'
+                  << '\t' << mn_mbr[5]
                   << std::dec << (*it)->subnode_list.size() << '\n';
     } //end for
 

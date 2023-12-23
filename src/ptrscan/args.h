@@ -28,6 +28,8 @@
 typedef struct {
 
     std::string target_str;
+    std::string output_file;
+    std::string input_file;
     byte ui_type;
     bool aligned;
     uintptr_t ptr_lookback;

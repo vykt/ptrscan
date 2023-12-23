@@ -1,0 +1,6 @@
+1) Double check that both single & multi threaded scans are correct since latest patch
+
+TO ADD:
+
+1) ncurses interface
+2) export .pscan files to either .json or .csv for easy integration with scripting langs
