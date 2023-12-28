@@ -10,19 +10,27 @@
 static unsigned int next_node_id = 0;
 
 
-//check if address is static
-int check_static(uintptr_t node_addr, proc_mem * p_mem) {
+//check if address is in read & write regions, or if it is in a static region (mode)
+int check_index(uintptr_t node_addr, proc_mem * p_mem, int mode) {
 
     bool eval;
-    
+    std::vector<maps_entry *> * mode_vector;
+
+
+    //get appropriate mode vector
+    if (mode == CHECK_RW) {
+        mode_vector = &p_mem->rw_regions_vector;
+    } else if (mode == CHECK_STATIC) {
+        mode_vector = &p_mem->static_regions_vector;
+    }
+
     //for every static region
-    for (unsigned int i = 0; 
-         i < (unsigned int) p_mem->static_regions_vector.size();  ++i) {
+    for (unsigned int i = 0; i < (unsigned int) mode_vector->size();  ++i) {
 
         //check if node_addr falls in range of this static region
-        eval = (uintptr_t) p_mem->static_regions_vector[i]->start_addr
+        eval = (uintptr_t) (*mode_vector)[i]->start_addr
                <= node_addr
-               && (uintptr_t) p_mem->static_regions_vector[i]->end_addr
+               && (uintptr_t) (*mode_vector)[i]->end_addr
                > node_addr;
 
         //if it does fall inside this static region
@@ -45,7 +53,8 @@ mem_node::mem_node(uintptr_t node_addr, uintptr_t point_addr,
 
     this->node_addr = node_addr;
     this->point_addr = point_addr;
-    this->static_regions_index = check_static(node_addr, p_mem);
+    this->rw_regions_index = check_index(node_addr, p_mem, CHECK_RW);
+    this->static_regions_index = check_index(node_addr, p_mem, CHECK_STATIC);
     this->parent_node = parent_node;
 }
 

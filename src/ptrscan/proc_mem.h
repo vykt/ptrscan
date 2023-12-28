@@ -35,10 +35,12 @@ class proc_mem {
         std::vector<maps_entry *> static_regions_vector;
 
         //public methods
+        //void init_proc_mem(args_struct * args, ui_base * ui);
         void init_proc_mem(args_struct * args, ui_base * ui);
 
     private:
         //private methods
+        //void fetch_pid(args_struct * args, ui_base * ui);
         void fetch_pid(args_struct * args, ui_base * ui);
         void maps_init(maps_data * m_data);
         void add_static(args_struct * args, maps_entry * m_entry);

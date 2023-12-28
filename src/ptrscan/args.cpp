@@ -105,16 +105,17 @@ inline uintptr_t process_int_argument(const char * exception_str) {
 }
 
 
-void process_args(int argc, char ** argv, args_struct * args) {
+int process_args(int argc, char ** argv, args_struct * args) {
 
-    const char * exception_str[6] = {
+    const char * exception_str[7] = {
         "process_args: use: -p <lookback:int> --ptr-lookback=<lookback:int>",
         "process_args: use: -l <depth> --levels=<depth>",
         "process_args: use: -s <name:str>,<skip:int> \
 --extra-static-regions=<name:str>,<skip:int>:<...>",
         "process_args: use: -t <thread_num> --threads=<thread_num>",
         "process_args: use: -a <addr> --target-addr=<addr>",
-        "process_args: use: ptrscan [flags] <target_name>"
+        "process_args: use: ptrscan [flags] <target_name>",
+        "process_args: no valid mode remaining."
     };
 
     //defined cmdline options
@@ -129,12 +130,16 @@ void process_args(int argc, char ** argv, args_struct * args) {
         {"threads", required_argument, NULL, 't'},
         {"output-file", required_argument, NULL, 'w'},
         {"input-file", required_argument, NULL, 'r'},
+        {"verify", no_argument, NULL, 'x'},
         {"target-addr", required_argument, NULL, 'a'},
         {0,0,0,0}
     };
 
     int opt, opt_index;
 
+    //mode array (use MACROs to index
+    int mode_array[MODE_COUNT] = {MODE_SCAN, MODE_SCAN_WRITE, MODE_READ, 
+                                  MODE_RESCAN, MODE_RESCAN_WRITE};
 
     //set default UI type
     args->ui_type = UI_TERM;
@@ -144,7 +149,7 @@ void process_args(int argc, char ** argv, args_struct * args) {
     args->aligned = true;
 
     //option processing while loop
-    while((opt = getopt_long(argc, argv, "cnp:l:s:qut:w:r:a:", 
+    while((opt = getopt_long(argc, argv, "cnp:l:s:qut:w:r:xa:", 
            long_opts, &opt_index)) != -1 
           && opt != 0) {
 
@@ -187,10 +192,30 @@ void process_args(int argc, char ** argv, args_struct * args) {
 
             case 'w': //output file
                 args->output_file.assign(optarg);
+                
+                //eliminate modes based on flag
+                mode_array[MODE_SCAN] = -1;
+                mode_array[MODE_READ] = -1;
+                mode_array[MODE_RESCAN] = -1;
+
                 break;
 
             case 'r': //input file
                 args->input_file.assign(optarg);
+
+                //eliminate modes based on flag
+                mode_array[MODE_SCAN] = -1;
+                mode_array[MODE_SCAN_WRITE] = -1;
+
+                break;
+
+            case 'x': //rescan
+
+                //eliminate modes based on flag
+                mode_array[MODE_SCAN] = -1;
+                mode_array[MODE_SCAN_WRITE] = -1;
+                mode_array[MODE_READ] = -1;
+                
                 break;
 
             case 'a': //target address
@@ -208,5 +233,12 @@ void process_args(int argc, char ** argv, args_struct * args) {
     }
     args->target_str.assign(argv[optind]);
 
-    return;
+    //return the earliest mode that is not eliminated
+    for (int i = 0; i < MODE_COUNT; ++i) {
+        if (mode_array[i] != -1) return mode_array[i];
+    } //end for
+    
+    //otherwise, throw an exception
+    throw std::runtime_error(exception_str[6]);
+    return -1;
 }

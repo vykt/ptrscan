@@ -12,6 +12,11 @@
 #include "proc_mem.h"
 
 
+#define CHECK_RW 0
+#define CHECK_STATIC 1
+
+
+
 /*
  *   We need root -> leaf traversal for construction, and leaf -> root traversal for 
  *   using the tree.
@@ -32,8 +37,9 @@ class mem_node {
     //attributes
     public:
     unsigned int id;
-    int static_regions_index; //-1 if not static
-    
+    int rw_regions_index;     //-1 if not in a rw region
+    int static_regions_index; //-1 if not in a static region
+
     uintptr_t node_addr;              //literal address of this node
     uintptr_t point_addr;             //where this node points to
     mem_node * parent_node;           //parents

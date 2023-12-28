@@ -7,14 +7,9 @@
 #include <libpwu.h>
 
 
-//additional region to treat as static in addition to .bss & [stack]
-typedef struct {
-
-    std::string pathname; //backing file
-    int skip;             //if multiple regions with `pathname` backing file have
-    int skipped;          //`perms` permissions, skip the first `skip` entries
-
-} static_region;
+//util functions
+int match_maps_obj(std::string basename, void * proc_mem_ptr, 
+                   maps_obj ** matched_m_obj);
 
 
 //abstract ui class, inherited from by terminal and tui ncurses interfaces
@@ -24,7 +19,9 @@ class ui_base {
         //methods
         virtual void report_exception(const std::exception& e) = 0;
         virtual pid_t clarify_pid(name_pid * n_pid) = 0;
-
+        //passing void * instead of serialise * to solve circular header include
+        virtual void output_serialised_results(void * serialise_ptr,
+                                               void * proc_mem_ptr) = 0;
 };
 
 

@@ -14,7 +14,7 @@
 #include "proc_mem.h"
 
 
-//thread controller, 'global state'
+//thread controller, 'global state' across threads
 class thread_ctrl {
 
     //attributes
