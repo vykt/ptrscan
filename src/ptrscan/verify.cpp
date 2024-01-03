@@ -80,13 +80,8 @@ int verify_chain(args_struct * args, proc_mem * p_mem, ui_base * ui,
 //verify results read from disk
 void verify(args_struct * args, proc_mem * p_mem, ui_base * ui, serialise * ser) {
 
-    const char * exception_str[1] = {
-        "verify: "
-    };
-
     int ret;
 
-    maps_entry * temp_m_entry;
     maps_obj * temp_m_obj;
 
     serial_entry * temp_s_entry;
@@ -101,8 +96,8 @@ void verify(args_struct * args, proc_mem * p_mem, ui_base * ui, serialise * ser)
         tse_basename = &ser->rw_region_str_vector[temp_s_entry->rw_regions_index];
 
         //get an object with matching basename
-        ret = get_region_by_basename((char *) tse_basename->c_str(), 0, &p_mem->m_data,
-                                     &temp_m_entry, &temp_m_obj);
+        ret = get_obj_by_basename((char *) tse_basename->c_str(), &p_mem->m_data,
+                                     &temp_m_obj);
         
         //if match not found, delete chain
         if (ret == -1) {

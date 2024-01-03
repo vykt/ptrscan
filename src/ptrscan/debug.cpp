@@ -121,7 +121,7 @@ void dump_structures_init(args_struct * args, proc_mem * p_mem) {
                   << (unsigned int) p_mem->rw_regions_vector[i]->perms << '\n'
                   << '\t' << me_mbr[2] << " : 0x"
                   << (uintptr_t) p_mem->rw_regions_vector[i]->start_addr << '\n'
-                  << '\t' << me_mbr[3] << " : 0x"
+                  << '\t' << me_mbr[3] << "   : 0x"
                   << (uintptr_t) p_mem->rw_regions_vector[i]->end_addr << '\n';
     } //end for
 

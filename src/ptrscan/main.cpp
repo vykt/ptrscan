@@ -23,17 +23,18 @@
 
 
 //generate pointer tree
-void threaded_scan(args_struct * args, proc_mem * p_mem, thread_ctrl * t_ctrl,
-                   mem_tree * m_tree, ui_base * ui) {
+void threaded_scan(args_struct * args, proc_mem * p_mem, 
+                   mem_tree ** m_tree, ui_base * ui) {
   
     //TODO USE UI TO REPORT PROGRESS OF SCAN
 
     //instantiate pointer map tree
-    m_tree = new mem_tree(args, p_mem);
+    thread_ctrl * t_ctrl;
+    (*m_tree) = new mem_tree(args, p_mem);
 
     //initialise the thread controller
     t_ctrl = new thread_ctrl();
-    t_ctrl->init(args, p_mem, m_tree, p_mem->pid);
+    t_ctrl->init(args, p_mem, *m_tree, p_mem->pid);
 
     #ifdef DEBUG
     dump_structures_thread_work(t_ctrl);
@@ -43,7 +44,7 @@ void threaded_scan(args_struct * args, proc_mem * p_mem, thread_ctrl * t_ctrl,
     for (unsigned int i = 1; i < args->levels; ++i) {
         
         //prepare the next level
-        t_ctrl->prepare_level(args, p_mem, m_tree);
+        t_ctrl->prepare_level(args, p_mem, *m_tree);
 
         //start next level
         t_ctrl->start_level();
@@ -52,7 +53,7 @@ void threaded_scan(args_struct * args, proc_mem * p_mem, thread_ctrl * t_ctrl,
         t_ctrl->end_level();
 
         #ifdef DEBUG
-        dump_structures_thread_level(t_ctrl, m_tree, i);
+        dump_structures_thread_level(t_ctrl, *m_tree, i);
         #endif
 
     } //end for every level
@@ -75,7 +76,6 @@ int main(int argc, char ** argv) {
     ui_base * ui;
 
     //allocated in called functions
-    thread_ctrl * t_ctrl;
     mem_tree * m_tree;
 
 
@@ -124,13 +124,13 @@ int main(int argc, char ** argv) {
             
             try {
                 //carry out scan
-                threaded_scan(&args, &p_mem, t_ctrl, m_tree, ui); 
+                threaded_scan(&args, &p_mem, &m_tree, ui); 
                 
                 //serialise results
                 ser.tree_to_results(&args, &p_mem, m_tree);
 
                 //output results
-                ui->output_serialised_results(&ser, &p_mem);
+                ui->output_serialised_results(&args, &ser, &p_mem);
             } catch (std::runtime_error& e) {
                 ui->report_exception(e);
             }
@@ -142,7 +142,7 @@ int main(int argc, char ** argv) {
 
             try {
                 //carry out scan
-                threaded_scan(&args, &p_mem, t_ctrl, m_tree, ui); 
+                threaded_scan(&args, &p_mem, &m_tree, ui); 
                 
                 //serialise results
                 ser.tree_to_results(&args, &p_mem, m_tree);
@@ -151,7 +151,7 @@ int main(int argc, char ** argv) {
                 ser.write_mem_ptrchains(&args, &p_mem);
 
                 //output results
-                ui->output_serialised_results(&ser, &p_mem);
+                ui->output_serialised_results(&args, &ser, &p_mem);
             } catch (std::runtime_error& e) {
                 ui->report_exception(e);
             }
@@ -166,7 +166,7 @@ int main(int argc, char ** argv) {
                 ser.read_disk_ptrchains(&args);
 
                 //output results
-                ui->output_serialised_results(&ser, &p_mem);
+                ui->output_serialised_results(&args, &ser, &p_mem);
             } catch (std::runtime_error& e) {
                 ui->report_exception(e);
             }
@@ -184,7 +184,7 @@ int main(int argc, char ** argv) {
                 verify(&args, &p_mem, ui, &ser);
 
                 //output results
-                ui->output_serialised_results(&ser, &p_mem);
+                ui->output_serialised_results(&args, &ser, &p_mem);
             } catch (std::runtime_error& e) {
                 ui->report_exception(e);
             }
@@ -206,7 +206,7 @@ int main(int argc, char ** argv) {
                 ser.write_mem_ptrchains(&args, &p_mem);
 
                 //output results
-                ui->output_serialised_results(&ser, &p_mem);
+                ui->output_serialised_results(&args, &ser, &p_mem);
             } catch (std::runtime_error& e) {
                 ui->report_exception(e);
             }
@@ -215,7 +215,7 @@ int main(int argc, char ** argv) {
 
     } //end switch
 
-    std::cout << "press enter to terminate." << std::endl;
-    getchar();
+    //std::cout << "press enter to terminate." << std::endl;
+    //getchar();
 
 }

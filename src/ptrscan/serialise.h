@@ -5,6 +5,8 @@
 
 #include <cstdint>
 
+#include <libpwu.h>
+
 #include "args.h"
 #include "mem_tree.h"
 
@@ -20,9 +22,13 @@
 //single set of offsets
 typedef struct {
 
-    uint32_t rw_regions_index;
-    uint32_t static_regions_index;
+    //read & write use (set by tree_to_results OR read_disk_ptrchains)
+    int rw_regions_index;
+    int static_regions_index;
     std::vector<uint32_t> * offset_vector;
+
+    //output use (set by output_serialised_results)
+    maps_obj * matched_m_obj;
 
 } serial_entry;
 
@@ -39,7 +45,7 @@ class serialise {
     //methods
     private:
     void recurse_get_next_offset(mem_node * m_node, serial_entry * s_entry,
-                             uintptr_t last_point);
+                                 uintptr_t last_point);
     void recurse_node(args_struct * args, mem_node * m_node, proc_mem * p_mem,
                       unsigned int current_level);
 

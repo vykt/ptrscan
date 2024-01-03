@@ -48,7 +48,7 @@ inline uint32_t get_stream_uint32_t(FILE * fs) {
     uint32_t ret;
 
     //for each byte of num
-    for (int i = 0; i < sizeof(ret); ++i) {
+    for (unsigned int i = 0; i < (unsigned int) sizeof(ret); ++i) {
 
         *(&ret+i) = fgetc(fs);
         handle_fgetc_err(*(&ret+i), fs, false);
@@ -140,7 +140,7 @@ void serialise::recurse_node(args_struct * args, mem_node * m_node, proc_mem * p
         if (ret == -1) throw std::runtime_error(exception_str[0]);
 
         //3. get the first entry of the maps_obj
-        ret = vector_get_ref(&m_obj->entry_vector, 0, (byte **) &m_obj_first_m_entry);
+        ret = vector_get(&m_obj->entry_vector, 0, (byte *) &m_obj_first_m_entry);
         if (ret == -1) throw std::runtime_error(exception_str[0]);
 
         //4. calculate the offset
@@ -153,7 +153,11 @@ void serialise::recurse_node(args_struct * args, mem_node * m_node, proc_mem * p
         //recursively traverse to root, adding offsets in the process
         this->recurse_get_next_offset(m_node->parent_node, &temp_s_entry,
                                       m_node->point_addr);
-    
+
+        //add this serial entry to the ptrchains vector
+        this->ptrchains_vector.push_back(temp_s_entry);
+
+
     //else recurse for all child nodes
     } else {
 

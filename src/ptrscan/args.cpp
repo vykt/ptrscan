@@ -141,12 +141,13 @@ int process_args(int argc, char ** argv, args_struct * args) {
     int mode_array[MODE_COUNT] = {MODE_SCAN, MODE_SCAN_WRITE, MODE_READ, 
                                   MODE_RESCAN, MODE_RESCAN_WRITE};
 
-    //set default UI type
+    //set defaults
     args->ui_type = UI_TERM;
     args->ptr_lookback = 0x400;
     args->target_addr = 0;
     args->levels = 5;
     args->aligned = true;
+    args->num_threads = 1;
 
     //option processing while loop
     while((opt = getopt_long(argc, argv, "cnp:l:s:qut:w:r:xa:", 

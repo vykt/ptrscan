@@ -238,7 +238,6 @@ void thread_ctrl::prepare_level(args_struct * args, proc_mem * p_mem,
 
     unsigned int min, max;
 
-    int unused_obj_index;
 
 
     //increment current level
@@ -268,7 +267,7 @@ void thread_ctrl::prepare_level(args_struct * args, proc_mem * p_mem,
 
         //calculate allowed lookback (shouldn't cross segment boundaries)
         ret = get_region_by_addr((void *) (*it)->node_addr, &matched_m_entry,
-                                 &matched_m_offset, &unused_obj_index, &p_mem->m_data);
+                                 &matched_m_offset, &p_mem->m_data);
         //throw exception if there is no match (should be never, memory corruption?)
         if (ret != 0) {
             throw std::runtime_error(exception_str[0]);
