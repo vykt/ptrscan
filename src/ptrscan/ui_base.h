@@ -20,7 +20,8 @@ class ui_base {
         virtual void report_exception(const std::exception& e) = 0;
         virtual pid_t clarify_pid(name_pid * n_pid) = 0;
         //passing void * instead of serialise * to solve circular header include
-        virtual void output_serialised_results(void * serialise_ptr,
+        virtual void output_serialised_results(void * args_ptr,
+                                               void * serialise_ptr,
                                                void * proc_mem_ptr) = 0;
 };
 

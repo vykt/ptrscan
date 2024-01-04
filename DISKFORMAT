@@ -9,16 +9,16 @@ This file defines the binary format used by ptrscan to store pointer chains.
 
  -- overview:
 
-    <rw region definitions><static_region_definitions><offsets>
+    <static_region_definitions><rw region definitions><offsets>
 
 
  -- rw region definitions
 
-    <name_0><NULL><name_1><DELIM_REGION>[...]<name_n><DELIM_REGION><DELIM_REGION>
+    <name_0><DELIM_REGION><name_1><DELIM_REGION>[..]<name_n><DELIM_REGION><DELIM_REGION>
 
     where:
       <name_x> is a string representing the 'pathname' field of proc maps.
-      <name_x> is only the name, not the full path. e.g.:
+      <name_x> is only the basename, not the full path. e.g.:
 
         "/usr/lib/libc.so.6" in proc maps becomes "libc.so.6"
 
@@ -27,15 +27,15 @@ This file defines the binary format used by ptrscan to store pointer chains.
 
  -- static region definitions
 
-    <name_0><NULL><name_1><NULL>[...]<name_n><NULL><NULL>
+    <name_0><DELIM_REGION><name_1><DELIM_REGION>[..]<name_n><DELIM_REGION><DELIM_REGION>
 
     where:
       <name_x> is a string representing the 'pathname' field of proc maps.
-      <name_x> is only the name, not the full path. e.g.:
+      <name_x> is only the basename, not the full path. e.g.:
 
         "/usr/lib/libc.so.6" in proc maps becomes "libc.so.6"
 
-      <NULL> is a single null byte.
+      <DELIM_REGION> is a single null byte.
 
 
  -- offsets
@@ -48,11 +48,11 @@ This file defines the binary format used by ptrscan to store pointer chains.
 
  -- offset set
 
-    <rw_region_id><static_region_id><offset_0><offset_1>[...]<offset_n><DELIM_OFFSET>
+    <static_region_id><rw_region_id><offset_0><offset_1>[...]<offset_n><DELIM_OFFSET>
 
     where:
+      <static_region_od> is an index into static region definitions. 
       <rw_region_id> is an index into rw region definitions.
-      <static_region_od> is an index into static region definitions.
       <offset_x> is a single uint32_t offset.
       
       <DELIM_OFFSET> is a 4 byte value 0xFFFFFFF0

@@ -46,11 +46,14 @@ inline bool handle_fgetc_err(int ret, FILE * fs, bool get_EOF) {
 inline uint32_t get_stream_uint32_t(FILE * fs) {
 
     uint32_t ret;
+    byte * ret_ptr;
+    
+    ret_ptr = (byte *) &ret;
 
     //for each byte of num
     for (unsigned int i = 0; i < (unsigned int) sizeof(ret); ++i) {
 
-        *(&ret+i) = fgetc(fs);
+        *(ret_ptr+i) = (byte) fgetc(fs);
         handle_fgetc_err(*(&ret+i), fs, false);
 
     } //end for
@@ -240,9 +243,9 @@ void serialise::write_mem_ptrchains(args_struct * args, proc_mem * p_mem) {
     std::vector<std::string> * regions_vectors[2];
 
 
-    //setup regions_vector array
-    regions_vectors[RW_REGIONS] = &this->rw_region_str_vector;
+    //setup regions_vector array 
     regions_vectors[STATIC_REGIONS] = &this->static_region_str_vector;
+    regions_vectors[RW_REGIONS] = &this->rw_region_str_vector;
 
 
     //get file stream for output file
@@ -260,7 +263,7 @@ void serialise::write_mem_ptrchains(args_struct * args, proc_mem * p_mem) {
 
             //record the static region name
             record_value((void *) (*regions_vectors[i])[j].c_str(), 
-                         sizeof(char), (*regions_vectors[i])[j].length(), fs);
+                         (*regions_vectors[i])[j].length(), sizeof(char), fs);
 
             //write delimiter
             record_value((void *) &delim_region, sizeof(delim_region), 1, fs);
@@ -282,13 +285,19 @@ void serialise::write_mem_ptrchains(args_struct * args, proc_mem * p_mem) {
                      1,
                      fs);
 
+        //record rw region index
+        record_value((void *) &this->ptrchains_vector[i].rw_regions_index,
+                     sizeof(this->ptrchains_vector[i].rw_regions_index),
+                     1,
+                     fs);
+
         //for each offset in offset set
         for (unsigned int j = 0; 
              j < (unsigned int) this->ptrchains_vector[i].offset_vector->size(); ++j) {
 
             //record offset
-            record_value((void *) &this->ptrchains_vector[i].offset_vector[j],
-                         sizeof(this->ptrchains_vector[i].offset_vector[j]),
+            record_value((void *) &(*this->ptrchains_vector[i].offset_vector)[j],
+                         sizeof((*this->ptrchains_vector[i].offset_vector)[j]),
                          1,
                          fs);
 
@@ -322,7 +331,7 @@ void serialise::read_disk_ptrchains(args_struct * args) {
     const uint32_t delim_offset = DELIM_OFFSET; 
 
     char region_def_buf[NAME_MAX];
-    uint32_t region_id_buf, offset_buf;
+    uint32_t static_region_id_buf, rw_region_id_buf, offset_buf;
     serial_entry temp_s_entry;
 
     int ret;
@@ -336,7 +345,7 @@ void serialise::read_disk_ptrchains(args_struct * args) {
 
     
     //get file stream for input file
-    fs = fopen(args->output_file.c_str(), "r");
+    fs = fopen(args->input_file.c_str(), "r");
     if (fs == nullptr) {
         throw std::runtime_error(exception_str[0]);
     }
@@ -366,7 +375,7 @@ void serialise::read_disk_ptrchains(args_struct * args) {
             //clear buffer
             memset(region_def_buf, 0, NAME_MAX);
 
-            //read the next static region entry
+            //read the next region entry
             for (unsigned int j = 0; j < NAME_MAX+1; ++j) {
 
                 //get next character
@@ -402,8 +411,12 @@ void serialise::read_disk_ptrchains(args_struct * args) {
         temp_s_entry.offset_vector = new std::vector<uint32_t>;
 
         //get the static region id
-        region_id_buf = get_stream_uint32_t(fs);
-        temp_s_entry.static_regions_index = region_id_buf;
+        static_region_id_buf = get_stream_uint32_t(fs);
+        temp_s_entry.static_regions_index = static_region_id_buf;
+
+        //get the rw region id
+        rw_region_id_buf = get_stream_uint32_t(fs);
+        temp_s_entry.rw_regions_index = rw_region_id_buf;
 
         //while there are offsets to read
         while((offset_buf = get_stream_uint32_t(fs)) != delim_offset) {
@@ -417,7 +430,6 @@ void serialise::read_disk_ptrchains(args_struct * args) {
         this->ptrchains_vector.push_back(temp_s_entry);
 
     } //end while
-
 
     //close file stream
     fclose(fs);
