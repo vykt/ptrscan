@@ -13,7 +13,7 @@
 #include "mem_tree.h"
 
 
-#define READ_BUF_SIZE 0x1000 //TODO maybe set to sizeof(memory page) later
+#define READ_BUF_SIZE 0x1000 //maybe set to sizeof(memory page) later
 
 
 //one of the regions a thread is set to scan
@@ -41,11 +41,12 @@ class thread {
 
     //attributes
     public:
+    int human_thread_id;
     pthread_t id;
     pthread_barrier_t * level_barrier; //points to thread_ctrl member
     
-    int mem_fd;             //fd for /proc/mem, opened by thread_ctrl
-    uintptr_t current_addr; //TODO not sure if this gets used
+    int mem_fd; //fd for /proc/mem, opened by thread_ctrl
+    uintptr_t current_addr;
     
     std::vector<parent_range> * parent_range_vector; //points to thread_ctrl member 
     std::vector<mem_range> regions_to_scan; //initialised separately by thread_ctrl
@@ -58,7 +59,8 @@ class thread {
     public:
     ssize_t get_next_buffer_smart(byte * mem_buf, ssize_t read_left, 
                                  ssize_t read_last, bool first_region_read);
-    void thread_main(args_struct * args, proc_mem * p_mem, mem_tree * m_tree);
+    void thread_main(args_struct * args, proc_mem * p_mem, mem_tree * m_tree,
+                     ui_base * ui);
 
     void reset_current_addr();
     

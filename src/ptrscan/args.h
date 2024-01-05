@@ -18,7 +18,7 @@
 #define STRTYPE_LLONG 2
 
 
-//TODO these could be reported back to main in a clever way (bitmask?)
+//these could be reported back to main in a clever way (bitmask?)
 #define MODE_SCAN 0
 #define MODE_SCAN_WRITE 1
 #define MODE_READ 2
@@ -50,6 +50,7 @@ typedef struct {
     std::string output_file;
     std::string input_file;
     byte ui_type;
+    bool verbose;
     bool aligned;
     uintptr_t ptr_lookback;
     uintptr_t target_addr;

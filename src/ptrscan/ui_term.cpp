@@ -8,6 +8,7 @@
 
 #include <unistd.h>
 
+#include <pthread.h>
 #include <libpwu.h>
 
 #include "ui_term.h"
@@ -147,6 +148,29 @@ inline void ui_term::report_exception(const std::exception& e) {
 }
 
 
+//report when a level is finished
+inline void ui_term::report_control_progress(int level_done) {
+    
+    std::cout << RED << "[ctrl]: level " << level_done << " finished.\n" << RESET;
+    return;
+}
+
+
+//acquire mutex & report thread progress
+inline void ui_term::report_thread_progress(unsigned int region_done, 
+                                            unsigned int region_total,
+                                            int human_thread_id) {
+
+    //to avoid using mutexes here, compose the string & call std::cout once
+    std::stringstream report;
+    report << "[thread " << human_thread_id << "] " << region_done << " out of "
+           << region_total << " finished.\n";
+    std::cout << report.str();
+
+    return;
+}
+
+
 //get user to pick one PID from multiple matches
 pid_t ui_term::clarify_pid(name_pid * n_pid) {
 
@@ -172,7 +196,7 @@ pid_t ui_term::clarify_pid(name_pid * n_pid) {
             throw std::runtime_error(exception_str[0]);
         }
 
-        std::cout << i << ": " << temp_pid << std::endl;
+        std::cout << i << ": " << *temp_pid << std::endl;
     }
 
     //ask until correct input is provided (they'll just type the PID i know it)
@@ -181,13 +205,13 @@ pid_t ui_term::clarify_pid(name_pid * n_pid) {
         input.clear();
         std::getline(std::cin, input);
         try {
+            std::cout << "> ";
             selection = std::stoi(input);
         } catch (std::exception& e) {
             std::cout << "invalid selection provided";
         }
     } //end while
 
-    //TODO then fix proc_mem::fetch_pid, it needs to call this
     return selection;
 }
 

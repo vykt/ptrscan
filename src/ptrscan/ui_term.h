@@ -22,6 +22,11 @@ class ui_term : public ui_base {
 
     public:
         virtual void report_exception(const std::exception& e);
+        virtual void report_control_progress(int level_done);
+        virtual void report_thread_progress(unsigned int region_done,
+                                            unsigned int region_total,
+                                            int human_thread_id);
+        
         virtual pid_t clarify_pid(name_pid * n_pid);
         virtual void output_serialised_results(void * args_ptr,
                                                void * serialise_ptr, 

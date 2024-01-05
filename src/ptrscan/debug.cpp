@@ -93,7 +93,7 @@ void dump_structures_init(args_struct * args, proc_mem * p_mem) {
     //dump args.extra_static_vector
     for (unsigned int i = 0; i < args->extra_region_vector.size(); ++i) {
         std::cerr << '\n' << '\t' 
-                  << "[DEBUG] --- (" << a_mbr[6] << ")[" << i << "]:\n";
+                  << "[DEBUG] --- (" << a_mbr[6] << ")[" << std::dec << i << "]:\n";
         std::cerr << '\t' << sr_mbr[0] << " : " 
                   << args->extra_region_vector[i].pathname << '\n'
                   << '\t' << sr_mbr[1] << "     : "
@@ -170,7 +170,7 @@ void dump_structures_thread_work(thread_ctrl * t_ctrl) {
         std::cerr << '\n'
                   << "[DEBUG] --- (thread_vector)[" << i << "]:";
         std::cerr << t_mbr[0]
-                  << t_ctrl->thread_vector[i].id << '\n';
+                  << t_ctrl->thread_vector[i].human_thread_id << '\n';
 
         //dump thread_ctrl.thread_vector[i].regions_to_scan
         for (unsigned int j = 0; 

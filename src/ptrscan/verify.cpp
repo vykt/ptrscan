@@ -34,7 +34,7 @@ int verify_chain(args_struct * args, proc_mem * p_mem, ui_base * ui,
 
 
     //get starting address for object
-    ret = vector_get_ref(&matched_obj->entry_vector, 0, (byte **) &first_m_entry);
+    ret = vector_get(&matched_obj->entry_vector, 0, (byte *) &first_m_entry);
     if (ret == -1) {
         throw std::runtime_error(exception_str[0]);
     }
@@ -101,7 +101,6 @@ void verify(args_struct * args, proc_mem * p_mem, ui_base * ui, serialise * ser)
         
         //if match not found, delete chain
         if (ret == -1) {
-            //TODO report deletion of entry
             ser->ptrchains_vector.erase(ser->ptrchains_vector.begin() + i);
             --i;
         }

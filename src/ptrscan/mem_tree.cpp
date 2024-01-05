@@ -2,6 +2,8 @@
 #include <list>
 #include <stdexcept>
 
+#include <pthread.h>
+
 #include "mem_tree.h"
 #include "proc_mem.h"
 #include "args.h"

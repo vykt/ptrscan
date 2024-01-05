@@ -1,5 +1,12 @@
+SELECT UI:
+
 -c --ui-term      : -toggle ui mode
 -n --ui-ncurses   : -max pointer lookback
+
+
+WHAT DO (terminal UI only):
+
+-v --verbose      : -more output, including scan progress
 
 -p --ptr-lookback : -max levels
 -l --levels       : -additional static regions (pathname & skip)

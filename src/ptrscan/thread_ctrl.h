@@ -31,7 +31,8 @@ class thread_ctrl {
                                 uintptr_t mem_sum);
 
     public:
-    void init(args_struct * args, proc_mem * p_mem, mem_tree * m_tree, pid_t pid); 
+    void init(args_struct * args, proc_mem * p_mem, mem_tree * m_tree, 
+              ui_base * ui, pid_t pid); 
 
     void prepare_level(args_struct * args, proc_mem * p_mem, mem_tree * m_tree);
     void start_level();

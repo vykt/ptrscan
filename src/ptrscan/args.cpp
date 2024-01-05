@@ -14,9 +14,6 @@
 #include "ui_base.h"
 
 
-//TODO fuzz me
-
-
 //process complex extra static regions argument (-s, --extra-static-regions)
 inline void process_extra_static_regions(args_struct * args, char * regions,
                                          const char * exception_str_) {
@@ -122,6 +119,7 @@ int process_args(int argc, char ** argv, args_struct * args) {
     struct option long_opts[] = {
         {"ui-term", no_argument, nullptr, 'c'},
         {"ui-ncurses", no_argument, nullptr, 'n'},
+        {"verbose", no_argument, nullptr, 'v'},
         {"ptr-lookback", required_argument, nullptr, 'p'},
         {"levels", required_argument, nullptr, 'l'},
         {"extra-static-regions", required_argument, NULL, 's'},
@@ -150,7 +148,7 @@ int process_args(int argc, char ** argv, args_struct * args) {
     args->num_threads = 1;
 
     //option processing while loop
-    while((opt = getopt_long(argc, argv, "cnp:l:s:qut:w:r:xa:", 
+    while((opt = getopt_long(argc, argv, "cnvp:l:s:qut:w:r:xa:", 
            long_opts, &opt_index)) != -1 
           && opt != 0) {
 
@@ -163,6 +161,10 @@ int process_args(int argc, char ** argv, args_struct * args) {
 
             case 'n': //ncurses UI
                 args->ui_type = UI_NCURSES;
+                break;
+
+            case 'v': //verbose
+                args->verbose = true;
                 break;
 
             case 'p': //pointer lookback

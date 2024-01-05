@@ -34,7 +34,7 @@ void threaded_scan(args_struct * args, proc_mem * p_mem,
 
     //initialise the thread controller
     t_ctrl = new thread_ctrl();
-    t_ctrl->init(args, p_mem, *m_tree, p_mem->pid);
+    t_ctrl->init(args, p_mem, *m_tree, ui, p_mem->pid);
 
     #ifdef DEBUG
     dump_structures_thread_work(t_ctrl);
@@ -51,6 +51,11 @@ void threaded_scan(args_struct * args, proc_mem * p_mem,
 
         //end level
         t_ctrl->end_level();
+
+        //report end of level
+        if (args->verbose) {
+            ui->report_control_progress(i);
+        }
 
         #ifdef DEBUG
         dump_structures_thread_level(t_ctrl, *m_tree, i);

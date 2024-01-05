@@ -36,16 +36,10 @@ uintptr_t thread_ctrl::get_rw_mem_sum(proc_mem * p_mem) {
 }
 
 
-/*
- *  TODO check this entire function, it is a mess
- */
 
 //define the regions a thread must scan
 void thread_ctrl::define_regions_to_scan(args_struct * args, proc_mem * p_mem, 
                                          uintptr_t mem_sum) {
-
-    //TODO remember, last thread gets the remainder
-    //TODO remember, threads must be able to scan boundaries between thread regions
     
     int reg_ind;
     uintptr_t mem_share, temp_share;
@@ -155,32 +149,45 @@ void thread_ctrl::define_regions_to_scan(args_struct * args, proc_mem * p_mem,
 
 //initialise thread controller & spawn threads
 void thread_ctrl::init(args_struct * args, proc_mem * p_mem, 
-                       mem_tree * m_tree, pid_t pid) {
+                       mem_tree * m_tree, ui_base * ui, pid_t pid) {
 
-    const char * exception_str[2] = { 
-        "thread_ctrl -> init: failed to malloc() thread arguments.",
-        "thread_ctrl -> init: failed to open file descriptor on proc mem for thread."
+    const char * exception_str[4] = { 
+        "thread_ctrl -> init: pthread_barrier_init() failed",
+        "thread_ctrl -> init: failed to open fd on proc mem for thread",
+        "thread_ctrl -> init: failed to malloc() thread arguments",
+        "thread_ctrl -> init: pthread_create() failed"
     };
 
     int ret;
+    int next_human_thread_id;
     uintptr_t mem_sum;
-   
+
     thread_arg * t_arg;
     thread t_temp;
+
+
+    //setup human readable thread ids
+    next_human_thread_id = 1;
 
     //set current level to 0 (root node)
     this->current_level = 0;
 
     //initialise thread level barrier, +1 since main thread handles control
     ret = pthread_barrier_init(&this->level_barrier, NULL, args->num_threads+1);
-    //TODO check return (pthread docs are cringe)
+    if (ret != 0) {
+        throw std::runtime_error(exception_str[0]);
+    }
 
     //get memory sum
     mem_sum = get_rw_mem_sum(p_mem);
 
     //instantiate thread objects
     for (unsigned int i = 0; i < args->num_threads; ++i) {
-        
+       
+        //set human thread id
+        t_temp.human_thread_id = next_human_thread_id;
+        next_human_thread_id += 1;
+
         //setup links to controller
         t_temp.level_barrier = &this->level_barrier;
         t_temp.parent_range_vector = &this->parent_range_vector;
@@ -204,18 +211,21 @@ void thread_ctrl::init(args_struct * args, proc_mem * p_mem,
         //setup args structure for new thread (deallocated by thread on exit)
         t_arg = (thread_arg *) malloc(sizeof(thread_arg));
         if (!t_arg) {
-            throw std::runtime_error(exception_str[0]);
+            throw std::runtime_error(exception_str[2]);
         }
 
         t_arg->args = args;
         t_arg->p_mem = p_mem;
         t_arg->m_tree = m_tree;
+        t_arg->ui = ui;
         t_arg->t = &this->thread_vector[i];
 
         //create thread
         ret = pthread_create(&this->thread_vector[i].id, NULL,
                               &thread_bootstrap, (void *) t_arg);
-        //TODO check return from pthread_create
+        if (ret != 0) {
+            throw std::runtime_error(exception_str[3]);
+        }
     }
 }
 

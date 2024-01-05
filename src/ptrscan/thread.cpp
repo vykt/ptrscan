@@ -28,7 +28,8 @@ void * thread_bootstrap(void * arg_bootstrap) {
 
     //call thread_main
     try {
-        real_arg->t->thread_main(real_arg->args, real_arg->p_mem, real_arg->m_tree);
+        real_arg->t->thread_main(real_arg->args, real_arg->p_mem, real_arg->m_tree,
+                                 real_arg->ui);
     } catch (std::runtime_error& e) {
         real_arg->ui->report_exception(e); //TODO this will cause a segfault if it runs
         pthread_exit((void *) &bad_ret);
@@ -46,7 +47,7 @@ void * thread_bootstrap(void * arg_bootstrap) {
 
 
 /*
- *  TODO the efficiency of reading can probably be improved with a circular buffer
+ *  the efficiency of reading can probably be improved with a circular buffer
  */
 
 //read the next buffer while allowing for unaligned pointer scanning across 
@@ -136,7 +137,8 @@ int thread::addr_parent_compare(uintptr_t addr, args_struct * args) {
 
 
 //main loop for each thread
-void thread::thread_main(args_struct * args, proc_mem * p_mem, mem_tree * m_tree) {
+void thread::thread_main(args_struct * args, proc_mem * p_mem, mem_tree * m_tree,
+                         ui_base * ui) {
 
     const char * exception_str[2] = {
         "thread -> thread_main: failed to seek to start of region.",
@@ -229,7 +231,17 @@ void thread::thread_main(args_struct * args, proc_mem * p_mem, mem_tree * m_tree
                 read_addr += read_last;
 
             } //end while
+
+
+            //report progress for thread
+            if (args->verbose) {
+                ui->report_thread_progress(j, 
+                    (unsigned int) this->regions_to_scan.size(),
+                    this->human_thread_id);
+            }
+
         } //end for every region
+
 
         //wait for thread_ctrl->end_level()
         pthread_barrier_wait(this->level_barrier);
