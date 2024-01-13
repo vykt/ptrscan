@@ -53,6 +53,11 @@ int verify_chain(args_struct * args, proc_mem * p_mem, ui_base * ui,
             throw std::runtime_error(exception_str[1]);
         }
 
+        //if this is the final iteration, do not derefence
+        if (i == (unsigned int) s_entry->offset_vector->size() - 1) {
+            continue;
+        }
+
         //dereference address
         rd_bytes = read(p_mem->mem_fd, &remote_addr, sizeof(remote_addr));
         if (rd_bytes == -1) {
@@ -110,6 +115,8 @@ void verify(args_struct * args, proc_mem * p_mem, ui_base * ui, serialise * ser)
         if (ret == -1) {
             //incorrect chain, therefore delete entry
             ser->ptrchains_vector.erase(ser->ptrchains_vector.begin() + i);
+            //do not decrement i to account for the shrinking of the vector
+            i -= 1;
         }
 
     } //end for
