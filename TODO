@@ -1,6 +1,24 @@
-1) Double check that both single & multi threaded scans are correct since latest patch
+TO FIX:
+
+1) When testing on large targes, the debug state dump will segfault. This does not occur if the debug output is redirected (via '2>') to a file. While unclear, this may be related to the segfault thrown when exceptions are improperly caught.
+
+    -I speculate that output to TTY is slow and the output buffer fills, resulting in 
+     a fail on one of the output functions, which (as intended or accidentally) throws 
+     an exception, which is improperly caught.
+
+    -Analyse core dump in future.
+
 
 TO ADD:
 
+!!!) way to export only static chains
+
 1) ncurses interface
-2) export .pscan files to either .json or .csv for easy integration with scripting langs
+2) export .pscan files to either .json or .csv for easy integration with scripting 
+   languages
+
+
+TO FIX (LONG TERM):
+
+1) add const where appropriate
+2) if scale increases, encapsulate everything
