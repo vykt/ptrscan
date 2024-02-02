@@ -1,5 +1,5 @@
 <p align="center">
-    <img src="logo.png" width="269" height="216">
+    <img src="logo.png">
 </p>
 
 # ptrscan
