@@ -186,26 +186,6 @@ void serialise::recurse_node(args_struct * args, mem_node * m_node, proc_mem * p
 void serialise::tree_to_results(args_struct * args, proc_mem * p_mem, 
                                 mem_tree * m_tree) {
 
-
-    // TODO DEBUG
-    
-    //for each entry in maps_data
-    maps_entry * temp_m_entry;
-    int ret;
-
-    for (unsigned long i = 0; i < p_mem->m_data.entry_vector.length; ++i) {
-
-        //fetch entry
-        ret = vector_get_ref(&p_mem->m_data.entry_vector, i, (byte **) &temp_m_entry);
-        if (ret == -1) printf("> VECTOR GET REF RETURNED -1 FOR INDEX %lu\n", i);
-        
-        printf("REGION %lu | OBJECT ID: %lu\n", i, temp_m_entry->obj_vector_index);
-    }
-
-    // TODO DEBUG END
-
-
-
     char * name_substring;
 
     /*
