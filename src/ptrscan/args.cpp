@@ -145,6 +145,7 @@ int process_args(int argc, char ** argv, args_struct * args) {
     args->target_addr = 0;
     args->levels = 5;
     args->aligned = true;
+    args->verbose = false;
     args->num_threads = 1;
 
     //option processing while loop
