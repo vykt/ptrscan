@@ -4,12 +4,6 @@ INSTALL_DIR=/usr/local/bin
 MAN_DIR=/usr/local/share/man
 
 #Check installation
-#If not running as root:
-if [ "$EUID" -ne 0 ]; then
-	echo "Please run the install script as root."
-	exit 1
-fi
-
 #If program has not been built:
 if [ ! -f "build/scan" ]; then
 	echo "'scan' executable missing in the build directory. Did you remember to run 'make' first?"
