@@ -32,7 +32,7 @@ $ cd ptrscan && ./buildgen.sh
 
 Build the release:
 ```
-$ make scan
+$ cd build && make scan
 ```
 
 Check the install script & install:
