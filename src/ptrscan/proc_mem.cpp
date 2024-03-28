@@ -173,9 +173,15 @@ void proc_mem::init_proc_mem(args_struct * args, ui_base * ui) {
     };
 
     int ret;
-    
-    //get PID for target process
-    fetch_pid(args, ui);
+
+		// if the target string contains only digits then it is a pid, if not then it is a process name.
+		if(args->target_str.find_first_not_of("0123456789") == std::string::npos){
+			//set pid
+			this->pid = (unsigned int)std::stoi(args->target_str.c_str());
+    }else{
+			//get PID for target process
+			fetch_pid(args, ui);
+    }
 
     //open file handles
     ret = open_memory(this->pid, &this->maps_stream, &this->mem_fd);

@@ -1,16 +1,22 @@
+<p align="center">
+    <img src="logo.png">
+</p>
+
 # ptrscan
 
-### OUT:
+### ABOUT:
 
 Ptrscan is an implementation of a pointer scanner following the ideas of Cheat Engine's own pointer scanner implementation. Ptrscan was written from scratch to run natively on Linux - no more running CE through wine. 
 
 [What is a pointer scanner?](https://guidedhacking.com/threads/cheat-engine-how-to-pointer-scan-with-pointermaps.9739/)
 
+---
 
 ### DEPENDENES:
 
 Ptrscan dynamically links [libpwu](https://github.com/vykt/libpwu). Visit the page and follow installation instructions.
 
+---
 
 ### INSTALLAON:
 
@@ -26,7 +32,7 @@ $ cd ptrscan && ./buildgen.sh
 
 Build the release:
 ```
-$ make scan
+$ cd build && make scan
 ```
 
 Check the install script & install:
@@ -34,6 +40,7 @@ Check the install script & install:
 $ cd .. && sudo ./install.sh
 ```
 
+---
 
 ### EXAMPLES:
 
@@ -57,6 +64,7 @@ ptrscan -x -a 0x55431bea1080 -r first_map.pscan -w second_map.pscan example_proc
 ptrscan -c -v -q -p 0x500 -l 4 -t 4 -a 0x7fffba434000 -w third_map.pscan example_proc
 ```
 
+---
 
 ### FUTURE CONSIDERATIONS:
 
