@@ -56,8 +56,8 @@ ssize_t inline thread::get_next_buffer_smart(byte * mem_buf, ssize_t read_left,
                                             ssize_t read_last, bool first_region_read) {
 
     const char * exception_str[2] = {
-        "thread -> get_next_buffer_smart: memory read into buffer failed.\0"
-        "thread -> get_next_buffer_smart: failsafe memory read into buffer failed.\0"
+        "thread -> get_next_buffer_smart: memory read into buffer failed."
+        "thread -> get_next_buffer_smart: failsafe memory read into buffer failed."
     };
 
     ssize_t min, max;
@@ -141,8 +141,8 @@ void thread::thread_main(args_struct * args, proc_mem * p_mem, mem_tree * m_tree
                          ui_base * ui) {
 
     const char * exception_str[2] = {
-        "thread -> thread_main: failed to seek to start of region.\0",
-        "thread -> thread_main: memory read into local buffer failed.\0"
+        "thread -> thread_main: failed to seek to start of region.",
+        "thread -> thread_main: memory read into local buffer failed."
     };
 
     int ret, parent_index;

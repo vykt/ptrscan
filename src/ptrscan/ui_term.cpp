@@ -185,7 +185,7 @@ pid_t ui_term::clarify_pid(name_pid * n_pid) {
     std::string buf;
 
 
-    std::cout << "please type a PID matching the target name:" << std::endl;
+    std::cout << "please provide a PID matching the target name (/proc/<pid>/comm):" << std::endl;
 
     //for every match
     for (unsigned int i = 0; i < n_pid->pid_vector.length; ++i) {
