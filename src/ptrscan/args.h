@@ -38,7 +38,9 @@ typedef struct {
 
     std::string pathname; //backing file
     int skip;             //if multiple regions with `pathname` backing file have
-    int skipped;          //`perms` permissions, skip the first `skip` entries
+                          //been found, skip 'skip' first regions.
+    //internal
+    int skipped;
 
 } static_region;
 
