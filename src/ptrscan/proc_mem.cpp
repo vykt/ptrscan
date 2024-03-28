@@ -14,7 +14,7 @@
 #include "ui_base.h"
 
 
-void proc_mem::fetch_pid(args_struct * args, ui_base * ui) {
+void proc_mem::interpret_target(args_struct * args, ui_base * ui) {
 
     const char * exception_str[3] = {
         "proc_mem -> fetch_pid: failed to initialise new_name_pid struct.",
@@ -23,6 +23,14 @@ void proc_mem::fetch_pid(args_struct * args, ui_base * ui) {
     };
 
     int ret;
+
+	//if the target string contains only digits then interpret as PID
+	if(args->target_str.find_first_not_of("0123456789") == std::string::npos) {
+        this->pid = (pid_t) std::stoi(args->target_str);
+        return;
+    }
+
+    //otherwise interpret as process name
 
     //initialise name_pid structure
     name_pid n_pid;
@@ -174,14 +182,8 @@ void proc_mem::init_proc_mem(args_struct * args, ui_base * ui) {
 
     int ret;
 
-		// if the target string contains only digits then it is a pid, if not then it is a process name.
-		if(args->target_str.find_first_not_of("0123456789") == std::string::npos){
-			//set pid
-			this->pid = (unsigned int)std::stoi(args->target_str.c_str());
-    }else{
-			//get PID for target process
-			fetch_pid(args, ui);
-    }
+    //get PID for target process
+	interpret_target(args, ui);
 
     //open file handles
     ret = open_memory(this->pid, &this->maps_stream, &this->mem_fd);
