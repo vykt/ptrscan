@@ -14,7 +14,7 @@ Ptrscan is an implementation of a pointer scanner following the ideas of Cheat E
 
 ### DEPENDENES:
 
-Ptrscan dynamically links [libpwu](https://github.com/vykt/libpwu). Visit the page and follow installation instructions.
+Ptrscan dynamically links [libpwu](https://github.com/vykt/libpwu). Release 0.1.4 is required. Visit the page and follow installation instructions.
 
 ---
 
