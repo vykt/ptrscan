@@ -41,7 +41,7 @@ class proc_mem {
     private:
         //private methods
         //void fetch_pid(args_struct * args, ui_base * ui);
-        void fetch_pid(args_struct * args, ui_base * ui);
+        void interpret_target(args_struct * args, ui_base * ui);
         void maps_init(maps_data * m_data);
         void add_static(args_struct * args, maps_entry * m_entry);
         void populate_regions(args_struct * args);

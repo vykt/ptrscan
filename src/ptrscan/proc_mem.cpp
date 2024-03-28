@@ -14,31 +14,61 @@
 #include "ui_base.h"
 
 
-void proc_mem::fetch_pid(args_struct * args, ui_base * ui) {
+void proc_mem::interpret_target(args_struct * args, ui_base * ui) {
 
-    const char * exception_str[3] = {
-        "proc_mem -> fetch_pid: failed to initialise new_name_pid struct.",
-        "proc_mem -> fetch_pid: failed to run name matches for PID.",
-        "proc_mem -> fetch_pid: no matches of name to PID."
+    const char * exception_str[4] = {
+        "proc_mem -> interpret_target: failed to retrieve process name for given PID.",
+        "proc_mem -> interpret_target: failed to initialise new_name_pid struct.",
+        "proc_mem -> interpret_target: failed to run name matches for PID.",
+        "proc_mem -> interpret_target: no matches of name to PID."
     };
 
     int ret;
+    char proc_name[NAME_MAX] = {};
+
+    static_region temp_s_region;
+
+	//if the target string contains only digits then interpret as PID
+	if(args->target_str.find_first_not_of("0123456789") == std::string::npos) {
+        
+        //set pid
+        this->pid = (pid_t) std::stoi(args->target_str);
+        
+        //get process name
+        ret = name_by_pid(this->pid, proc_name);
+        if (ret) {
+            throw std::runtime_error(exception_str[0]);
+        }
+
+        //create new region to treat as static using the process name
+        temp_s_region.pathname = proc_name;
+        temp_s_region.pathname.erase(temp_s_region.pathname.size() - 1);
+        temp_s_region.skip = 0;
+        temp_s_region.skipped = 0;
+
+        //add static region
+        args->extra_region_vector.push_back(temp_s_region);
+            
+        return;
+    }
+
+    //otherwise interpret as process name
 
     //initialise name_pid structure
     name_pid n_pid;
     ret = new_name_pid(&n_pid, (char *) args->target_str.c_str());
     if (ret) {
-        throw std::runtime_error(exception_str[0]);
+        throw std::runtime_error(exception_str[1]);
     }
 
     //fetch PIDs for name & deal with result
     ret = pid_by_name(&n_pid, &this->pid);
     switch (ret) {
         case -1:
-            throw std::runtime_error(exception_str[1]);
+            throw std::runtime_error(exception_str[2]);
             break;
         case 0:
-            throw std::runtime_error(exception_str[2]);
+            throw std::runtime_error(exception_str[3]);
             break;
         case 1:
             break;
@@ -173,9 +203,9 @@ void proc_mem::init_proc_mem(args_struct * args, ui_base * ui) {
     };
 
     int ret;
-    
+
     //get PID for target process
-    fetch_pid(args, ui);
+	interpret_target(args, ui);
 
     //open file handles
     ret = open_memory(this->pid, &this->maps_stream, &this->mem_fd);

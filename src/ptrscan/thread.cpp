@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include <cstdlib>
+#include <cstdio>
 #include <cstring>
 #include <cstdint>
 
@@ -83,6 +84,7 @@ ssize_t inline thread::get_next_buffer_smart(byte * mem_buf, ssize_t read_left,
     //read up to read_buf_effective_size bytes (if scheduler is kind)
     read_bytes = read(this->mem_fd, mem_buf, to_read);
     if (read_bytes == -1) {
+        perror("[ERRNO]"); //TODO TEMPORARY
         throw std::runtime_error(exception_str[0]);
     }
 
@@ -100,6 +102,7 @@ ssize_t inline thread::get_next_buffer_smart(byte * mem_buf, ssize_t read_left,
         read_bytes_failsafe = read(this->mem_fd, mem_buf+read_bytes,
                                    read_bytes % sizeof(uintptr_t));
         if (read_bytes_failsafe == -1) {
+            perror("[ERRNO]"); //TODO TEMPORARY
             throw std::runtime_error(exception_str[1]);
         }
         read_bytes += read_bytes_failsafe;

@@ -111,7 +111,7 @@ int process_args(int argc, char ** argv, args_struct * args) {
 --extra-static-regions=<name:str>,<skip:int>:<...>",
         "process_args: use: -t <thread_num> --threads=<thread_num>",
         "process_args: use: -a <addr> --target-addr=<addr>",
-        "process_args: use: ptrscan [flags] <target_name>",
+        "process_args: use: ptrscan [flags] <target_name | target_pid>",
         "process_args: no valid mode remaining."
     };
 
