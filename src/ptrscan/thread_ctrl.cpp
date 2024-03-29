@@ -186,6 +186,7 @@ void thread_ctrl::init(args_struct * args, proc_mem * p_mem,
        
         //set human thread id
         t_temp.human_thread_id = next_human_thread_id;
+        t_temp.current_level = &this->current_level;
         next_human_thread_id += 1;
 
         //setup links to controller

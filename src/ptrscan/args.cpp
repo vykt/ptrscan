@@ -14,9 +14,78 @@
 #include "ui_base.h"
 
 
+//process integer arguments 
+inline uintptr_t process_int_argument(const char * argument, const char * exception_str) {
+
+    uintptr_t temp;
+    char * optarg_mod;
+    int base;
+
+    optarg_mod = optarg;
+    base = 10;
+
+    //check for null
+    if (argument == nullptr) {
+        throw std::runtime_error(exception_str);
+    }
+
+    //switch to base 16
+    if (!strncmp(argument, "0x", 2)) {
+        base = 16;
+        optarg_mod += 2;
+    }
+
+    //try to convert to unsigned int
+    try {
+        temp = std::stol(argument, NULL, base);
+    } catch(std::exception &e) {
+        throw std::runtime_error(exception_str);
+    }
+
+    return temp;
+}
+
+
+//process offsets
+void process_offsets(args_struct * args, char * offsets, const char * exception_str_) {
+
+    const char * exception_str[1] {
+        "process_offsets: failed to convert offset to uintptr_t."
+    };
+
+    char * next_offset_str;
+    char * lookahead_comma;
+
+    uintptr_t temp_offset;
+    int iter;
+
+    //throw exception if no argument passed
+    if (optarg == nullptr) {
+        throw std::runtime_error(exception_str_);
+    }
+
+    next_offset_str = offsets;
+
+    //for every offset
+    do {
+
+        //convert string to uintptr_t
+        temp_offset = process_int_argument(next_offset_str, exception_str[0]);
+
+        //add offset
+        args->preset_offsets.insert(args->preset_offsets.end(), temp_offset);
+
+        //get lookahead pointers
+        lookahead_comma = strchr(next_offset_str, ',');
+        next_offset_str = lookahead_comma + 1;
+
+    } while (lookahead_comma != nullptr);
+}
+
+
 //process complex extra static regions argument (-s, --extra-static-regions)
-inline void process_extra_static_regions(args_struct * args, char * regions,
-                                         const char * exception_str_) {
+void process_regions(args_struct * args, std::vector<region> * region_vector, 
+                            char * regions, const char * exception_str_) {
 
     //exception(s) for incorrect internal format of static regions
     const char * exception_str[1] {
@@ -27,7 +96,7 @@ inline void process_extra_static_regions(args_struct * args, char * regions,
     char * lookahead_comma;
     char * lookahead_slash;
 
-    static_region temp_region;
+    region temp_region;
 
 
     //throw exception if no argument passed
@@ -62,7 +131,7 @@ inline void process_extra_static_regions(args_struct * args, char * regions,
         temp_region.skipped = 0;
 
         //add temp region
-        args->extra_region_vector.insert(args->extra_region_vector.end(), temp_region);
+        region_vector->insert(region_vector->end(), temp_region);
 
     //while there are extra regions left to process
     } while((next_region_str = 
@@ -70,45 +139,14 @@ inline void process_extra_static_regions(args_struct * args, char * regions,
 }
 
 
-//process integer arguments 
-inline uintptr_t process_int_argument(const char * exception_str) {
-
-    uintptr_t temp;
-    char * optarg_mod;
-    int base;
-
-    optarg_mod = optarg;
-    base = 10;
-
-    //check for null
-    if (optarg == nullptr) {
-        throw std::runtime_error(exception_str);
-    }
-
-    //switch to base 16
-    if (!strncmp(optarg, "0x", 2)) {
-        base = 16;
-        optarg_mod += 2;
-    }
-
-    //try to convert to unsigned int
-    try {
-        temp = std::stol(optarg, NULL, base);
-    } catch(std::exception &e) {
-        throw std::runtime_error(exception_str);
-    }
-
-    return temp;
-}
-
-
 int process_args(int argc, char ** argv, args_struct * args) {
 
-    const char * exception_str[7] = {
+    const char * exception_str[] = {
         "process_args: use: -p <lookback:int> --ptr-lookback=<lookback:int>",
         "process_args: use: -l <depth> --levels=<depth>",
-        "process_args: use: -s <name:str>,<skip:int> \
---extra-static-regions=<name:str>,<skip:int>:<...>",
+        "process_args: use: -s <name:str>,<skip:int> --extra-static-regions=<name:str>,<skip:int>:[...]",
+        "process_args: use: -r <name:str>,<skip:int> --define-rw-regions=<name:str>,<skip:int>:[...]",
+        "process_args: use: -o <off1>,<off2>,[...] --offsets=<off1>,<off2>,[...]",
         "process_args: use: -t <thread_num> --threads=<thread_num>",
         "process_args: use: -a <addr> --target-addr=<addr>",
         "process_args: use: ptrscan [flags] <target_name | target_pid>",
@@ -123,6 +161,8 @@ int process_args(int argc, char ** argv, args_struct * args) {
         {"ptr-lookback", required_argument, nullptr, 'p'},
         {"levels", required_argument, nullptr, 'l'},
         {"extra-static-regions", required_argument, NULL, 's'},
+        {"define-rw-regions", required_argument, NULL, 'e'},
+        {"offsets", required_argument, NULL, 'o'},
         {"aligned", no_argument, NULL, 'q'},
         {"unaligned", no_argument, NULL, 'u'},
         {"threads", required_argument, NULL, 't'},
@@ -146,10 +186,11 @@ int process_args(int argc, char ** argv, args_struct * args) {
     args->levels = 5;
     args->aligned = true;
     args->verbose = false;
+    args->use_preset_offsets = false;
     args->num_threads = 1;
 
     //option processing while loop
-    while((opt = getopt_long(argc, argv, "cnvp:l:s:qut:w:r:xa:", 
+    while((opt = getopt_long(argc, argv, "cnvp:l:s:r:o:qut:w:e:xa:", 
            long_opts, &opt_index)) != -1 
           && opt != 0) {
 
@@ -170,15 +211,24 @@ int process_args(int argc, char ** argv, args_struct * args) {
 
             case 'p': //pointer lookback
                 args->ptr_lookback = 
-                    (uintptr_t) process_int_argument(exception_str[0]);
+                    (uintptr_t) process_int_argument(optarg, exception_str[0]);
                 break;
             
             case 'l': //depth level
-                args->levels = (unsigned int) process_int_argument(exception_str[1]);
+                args->levels = (unsigned int) process_int_argument(optarg, exception_str[1]);
                 break;
             
             case 's': //extra memory regions to treat as static
-                process_extra_static_regions(args, optarg, exception_str[2]);
+                process_regions(args, &args->extra_static_vector, optarg, exception_str[2]);
+                break;
+
+            case 'e': //exhaustive list of rw- regions to scan
+                process_regions(args, &args->extra_rw_vector, optarg, exception_str[3]);
+                break;
+
+            case 'o': //specify preset offsets
+                process_offsets(args, optarg, exception_str[4]);
+                args->use_preset_offsets = true;
                 break;
 
             case 'q': //aligned pointer scan
@@ -191,7 +241,7 @@ int process_args(int argc, char ** argv, args_struct * args) {
 
             case 't': //number of threads
                 args->num_threads = 
-                    (unsigned int) process_int_argument(exception_str[3]);
+                    (unsigned int) process_int_argument(optarg, exception_str[5]);
                 break;
 
             case 'w': //output file
@@ -223,7 +273,7 @@ int process_args(int argc, char ** argv, args_struct * args) {
                 break;
 
             case 'a': //target address
-                args->target_addr = (uintptr_t) process_int_argument(exception_str[4]); 
+                args->target_addr = (uintptr_t) process_int_argument(optarg, exception_str[6]); 
                 break;
 
         } //end switch
@@ -231,9 +281,18 @@ int process_args(int argc, char ** argv, args_struct * args) {
     } //end opt while loop
 
 
+    //fill remainder of preset_array with -1
+    if (args->use_preset_offsets) {
+
+        //for every remaining level without a preset offset
+        for (int i = args->preset_offsets.size(); i < args->levels; ++i) {
+            args->preset_offsets.insert(args->preset_offsets.end(), (uintptr_t) -1);
+        }
+    }
+
     //assign target string and check for null
     if (argv[optind] == 0) {
-        throw std::runtime_error(exception_str[5]);
+        throw std::runtime_error(exception_str[7]);
     }
     args->target_str.assign(argv[optind]);
 
@@ -243,6 +302,6 @@ int process_args(int argc, char ** argv, args_struct * args) {
     } //end for
     
     //otherwise, throw an exception
-    throw std::runtime_error(exception_str[6]);
+    throw std::runtime_error(exception_str[8]);
     return -1;
 }

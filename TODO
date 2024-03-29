@@ -9,6 +9,16 @@ TO FIX:
     -Analyse core dump in future.
 
 
+
+TO ADD (URGENT):
+
+    -change args.extra_region_vector -> args.extra_static_vector v
+    -define regions to scan v
+    -define offsets (reverse order(?)) v
+    -blacklist segments v
+
+
+
 TO ADD:
 
 !!!) way to export only static chains

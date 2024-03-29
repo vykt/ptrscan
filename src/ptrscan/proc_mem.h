@@ -18,7 +18,8 @@
 #define STATIC_REGION_BSS 0
 #define STATIC_REGION_STACK 1
 
-//region memory permissions mask
+//number of blacklisted segments
+#define SEG_BLACKLIST_SIZE 2
 
 
 //target process memory class

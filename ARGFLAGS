@@ -20,4 +20,7 @@ WHAT DO (terminal UI only):
 
 -a --target-addr  : -specify address being pointer scanned for
 
--s <name,skip:[...]> --extra-static-regions=<name,skip:[...]>  : -add static regions
+-s <name,skip:[...]>   --extra-static-regions=<name,skip:[...]>  : -add static regions
+-e <name,skip:[...]>   --define-rw-regions=<name,skip:[...]>     : -only scan listed rw- regions (must be superset of static regions)
+
+-o <off1>,<off2>,[...] --offsets=<off1>,<off2>,[...]             : -specify first n offsets

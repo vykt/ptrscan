@@ -50,10 +50,10 @@ void dump_structures_init(args_struct * args, proc_mem * p_mem) {
         "ptr_lookback",       //uintptr_t
         "levels",             //unsigned int
         "num_threads",        //unsigned int
-        "extra_region_vector" //std::vector<static_region>
+        "extra_static_vector" //std::vector<region>
     };
 
-    //static_region members
+    //region members
     const char * sr_mbr[STATIC_REGION_MEMBERS] {
         "pathname", //std::string
         "skip",     //int
@@ -91,15 +91,15 @@ void dump_structures_init(args_struct * args, proc_mem * p_mem) {
               << " --- " << a_mbr[6] << ": \n";
     
     //dump args.extra_static_vector
-    for (unsigned int i = 0; i < args->extra_region_vector.size(); ++i) {
+    for (unsigned int i = 0; i < args->extra_static_vector.size(); ++i) {
         std::cerr << '\n' << '\t' 
                   << "[DEBUG] --- (" << a_mbr[6] << ")[" << std::dec << i << "]:\n";
         std::cerr << '\t' << sr_mbr[0] << " : " 
-                  << args->extra_region_vector[i].pathname << '\n'
+                  << args->extra_static_vector[i].pathname << '\n'
                   << '\t' << sr_mbr[1] << "     : "
-                  << args->extra_region_vector[i].skip << '\n'
+                  << args->extra_static_vector[i].skip << '\n'
                   << '\t' << sr_mbr[2] << "  : "
-                  << args->extra_region_vector[i].skipped << '\n';
+                  << args->extra_static_vector[i].skipped << '\n';
     } //end for
     
     //dump p_mem part 1

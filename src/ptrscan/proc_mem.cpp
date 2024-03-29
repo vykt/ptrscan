@@ -26,7 +26,7 @@ void proc_mem::interpret_target(args_struct * args, ui_base * ui) {
     int ret;
     char proc_name[NAME_MAX] = {};
 
-    static_region temp_s_region;
+    region temp_s_region;
 
 	//if the target string contains only digits then interpret as PID
 	if(args->target_str.find_first_not_of("0123456789") == std::string::npos) {
@@ -40,15 +40,19 @@ void proc_mem::interpret_target(args_struct * args, ui_base * ui) {
             throw std::runtime_error(exception_str[0]);
         }
 
+        //set target_str to proc_name to correctly define static regions later
+        args->target_str = proc_name;
+
+        //TODO remove, shouldn't be necessary (test first)
         //create new region to treat as static using the process name
-        temp_s_region.pathname = proc_name;
+        /*temp_s_region.pathname = proc_name;
         temp_s_region.pathname.erase(temp_s_region.pathname.size() - 1);
         temp_s_region.skip = 0;
         temp_s_region.skipped = 0;
 
         //add static region
-        args->extra_region_vector.push_back(temp_s_region);
-            
+        args->extra_static_vector.push_back(temp_s_region);
+        */  
         return;
     }
 
@@ -112,15 +116,15 @@ void proc_mem::maps_init(maps_data * m_data) {
 inline void proc_mem::add_static(args_struct * args, maps_entry * m_entry) {
 
     int ret;
-    static_region * temp_region;
+    region * temp_region;
 
     const char * name_substring = strrchr((const char *) m_entry->pathname, '/') + 1;
     if (name_substring == (char *) 1) name_substring = m_entry->pathname;
 
     //for every static region
-    for (unsigned int i = 0; i < args->extra_region_vector.size(); ++i) {
+    for (unsigned int i = 0; i < args->extra_static_vector.size(); ++i) {
 
-        temp_region = &(args->extra_region_vector)[i];
+        temp_region = &(args->extra_static_vector)[i];
 
         //continue if pathname doesn't match
         ret = strncmp(name_substring, temp_region->pathname.c_str(), NAME_MAX);
@@ -132,7 +136,7 @@ inline void proc_mem::add_static(args_struct * args, maps_entry * m_entry) {
 
         //if reached here, its a match
         this->static_regions_vector.insert(this->static_regions_vector.end(), m_entry);
-        args->extra_region_vector.erase(args->extra_region_vector.begin() + i);
+        args->extra_static_vector.erase(args->extra_static_vector.begin() + i);
         break; //should never match more than one entry
 
     } //end for every static region
@@ -147,19 +151,32 @@ void proc_mem::populate_regions(args_struct * args) {
         "proc_mem -> populate_rw_regions: vector get reference error."
     };
 
-    const static_region stack_region = { "[stack]", 0, 0 };
-    const static_region bss_region = { args->target_str, 0, 0 };
+    //TODO add others
+    const char * segment_blacklist[SEG_BLACKLIST_SIZE] = {
+        "/dev",
+        "/memfd"
+    };
+
+    const region stack_region = { "[stack]", 0, 0 };
+    const region bss_region = { args->target_str, 0, 0 };
 
     int ret;
+    bool extra_rw_found;
     maps_entry * m_entry;
 
 
+    //add standard rw regions to rw_regions_vector
+    args->extra_rw_vector.insert(args->extra_rw_vector.begin(), stack_region);
+    args->extra_rw_vector.insert(args->extra_rw_vector.begin(), bss_region);
+
     //add standard static regions to static_regions_vector
-    args->extra_region_vector.insert(args->extra_region_vector.begin(), stack_region);
-    args->extra_region_vector.insert(args->extra_region_vector.begin(), bss_region);
+    args->extra_static_vector.insert(args->extra_static_vector.begin(), stack_region);
+    args->extra_static_vector.insert(args->extra_static_vector.begin(), bss_region);
 
     //for every memory region with distinct access permissions
     for (int i = 0; i < (int) this->m_data.entry_vector.length; ++i) {
+
+        extra_rw_found = false;
 
         ret = vector_get_ref(&this->m_data.entry_vector, (unsigned long) i,
                              (byte **) &m_entry);
@@ -167,12 +184,33 @@ void proc_mem::populate_regions(args_struct * args) {
             throw std::runtime_error(exception_str[0]);
         }
 
+        //skip blacklisted segments
+        for (int i = 0; i < SEG_BLACKLIST_SIZE; ++i) {
+            if (!strncmp(m_entry->pathname, segment_blacklist[i], strlen(segment_blacklist[i]))) continue;
+        }
+
         //test for read & write permissions
-        if ((m_entry->perms & 0x01) && (m_entry->perms & 0x02)) {
-            this->rw_regions_vector.insert(this->rw_regions_vector.end(), m_entry);
-        } else {
+        if (!((m_entry->perms & 0x01) && (m_entry->perms & 0x02))) {
             continue;
         }
+
+        //check if exhaustive rw region vector is in use
+        if (!(args->extra_rw_vector.empty())) {
+            
+            //for all regions in exhaustive rw region vector
+            for (int i = 0; i < args->extra_rw_vector.size(); ++i) {
+                if (args->extra_rw_vector[i].pathname == m_entry->basename) {
+                    extra_rw_found = true;
+                    break;
+                }
+            } //end for
+
+            if (!extra_rw_found) continue;
+        } //end exhaustive rw vector check
+
+
+        //passed all checks, add to rw- vector
+        this->rw_regions_vector.insert(this->rw_regions_vector.end(), m_entry);
 
         //add static region
         add_static(args, m_entry);
