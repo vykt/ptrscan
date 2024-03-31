@@ -43,6 +43,11 @@ void proc_mem::interpret_target(args_struct * args, ui_base * ui) {
         //set target_str to proc_name to correctly define static regions later
         args->target_str = proc_name;
 
+        //remove trailing newline if present
+        if (args->target_str[args->target_str.size() - 1] == '\n') {
+            args->target_str.erase(args->target_str.size() - 1);
+        }
+
         //TODO remove, shouldn't be necessary (test first)
         //create new region to treat as static using the process name
         /*temp_s_region.pathname = proc_name;
@@ -136,7 +141,6 @@ inline void proc_mem::add_static(args_struct * args, maps_entry * m_entry) {
 
         //if reached here, its a match
         this->static_regions_vector.insert(this->static_regions_vector.end(), m_entry);
-        args->extra_static_vector.erase(args->extra_static_vector.begin() + i);
         break; //should never match more than one entry
 
     } //end for every static region
@@ -158,6 +162,7 @@ void proc_mem::populate_regions(args_struct * args) {
     };
 
     const region stack_region = { "[stack]", 0, 0 };
+    const region heap_region = {"[heap]", 0, 0};
     const region bss_region = { args->target_str, 0, 0 };
 
     int ret;
@@ -167,6 +172,7 @@ void proc_mem::populate_regions(args_struct * args) {
 
     //add standard rw regions to rw_regions_vector
     args->extra_rw_vector.insert(args->extra_rw_vector.begin(), stack_region);
+    args->extra_rw_vector.insert(args->extra_rw_vector.begin(), heap_region);
     args->extra_rw_vector.insert(args->extra_rw_vector.begin(), bss_region);
 
     //add standard static regions to static_regions_vector
@@ -198,7 +204,7 @@ void proc_mem::populate_regions(args_struct * args) {
         if (!(args->extra_rw_vector.empty())) {
             
             //for all regions in exhaustive rw region vector
-            for (int i = 0; i < args->extra_rw_vector.size(); ++i) {
+            for (unsigned long int i = 0; i < args->extra_rw_vector.size(); ++i) {
                 if (args->extra_rw_vector[i].pathname == m_entry->basename) {
                     extra_rw_found = true;
                     break;

@@ -17,6 +17,9 @@
 #include "mem_tree.h"
 
 
+//TODO DEBUG INCLUDES, PURGE
+#include <iostream>
+
 
 //bootstrap function
 void * thread_bootstrap(void * arg_bootstrap) {
@@ -120,16 +123,18 @@ int thread::addr_parent_compare(uintptr_t addr, args_struct * args) {
 
     bool eval_range;
 
+    
+
     //check if preset offsets are in use
     if (args->use_preset_offsets) {
         
         //check if a preset offset was supplied for this depth level
-        if (args->preset_offsets[*this->current_level] != -1) {
+        if ( (long int) args->preset_offsets[*this->current_level - 1] != -1) {
 
             //for every parent region
             for (unsigned int i = 0; i < (unsigned int) this->parent_range_vector->size(); ++i) {
 
-                eval_range = (addr == (*this->parent_range_vector)[i].end_addr - args->preset_offsets[*this->current_level]);
+                eval_range = (addr == (*this->parent_range_vector)[i].end_addr - args->preset_offsets[*this->current_level - 1]);
                 if (eval_range) return i;
             } //end for
             

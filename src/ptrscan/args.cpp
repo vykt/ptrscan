@@ -57,7 +57,6 @@ void process_offsets(args_struct * args, char * offsets, const char * exception_
     char * lookahead_comma;
 
     uintptr_t temp_offset;
-    int iter;
 
     //throw exception if no argument passed
     if (optarg == nullptr) {
@@ -285,7 +284,7 @@ int process_args(int argc, char ** argv, args_struct * args) {
     if (args->use_preset_offsets) {
 
         //for every remaining level without a preset offset
-        for (int i = args->preset_offsets.size(); i < args->levels; ++i) {
+        for (unsigned int i = args->preset_offsets.size(); i < args->levels; ++i) {
             args->preset_offsets.insert(args->preset_offsets.end(), (uintptr_t) -1);
         }
     }
