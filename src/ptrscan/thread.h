@@ -42,6 +42,7 @@ class thread {
     //attributes
     public:
     int human_thread_id;
+    unsigned int * current_level; //points to thread controller's current_level
     pthread_t id;
     pthread_barrier_t * level_barrier; //points to thread_ctrl member
     

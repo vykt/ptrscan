@@ -42,7 +42,7 @@ typedef struct {
     //internal
     int skipped;
 
-} static_region;
+} region;
 
 
 //arguments passed via flags
@@ -54,11 +54,14 @@ typedef struct {
     byte ui_type;
     bool verbose;
     bool aligned;
+    bool use_preset_offsets;
     uintptr_t ptr_lookback;
     uintptr_t target_addr;
     unsigned int levels;
     unsigned int num_threads;
-    std::vector<static_region> extra_region_vector;
+    std::vector<region> extra_static_vector; //TODO rename to extra_static_vector
+    std::vector<region> extra_rw_vector;
+    std::vector<uintptr_t> preset_offsets;
 
 } args_struct;
 
