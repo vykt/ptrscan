@@ -19,7 +19,7 @@
 #define STATIC_REGION_STACK 1
 
 //number of blacklisted segments
-#define SEG_BLACKLIST_SIZE 2
+#define SEG_BLACKLIST_SIZE 3
 
 
 //target process memory class

@@ -21,6 +21,7 @@ class ui_base {
     virtual void report_control_progress(int level_done) = 0;
     virtual void report_thread_progress(unsigned int region_done,
                                         unsigned int region_total,
+                                        unsigned int current_level,
                                         int human_thread_id) = 0;
     
     virtual pid_t clarify_pid(name_pid * n_pid) = 0;

@@ -134,7 +134,8 @@ int thread::addr_parent_compare(uintptr_t addr, args_struct * args) {
             //for every parent region
             for (unsigned int i = 0; i < (unsigned int) this->parent_range_vector->size(); ++i) {
 
-                eval_range = (addr == (*this->parent_range_vector)[i].end_addr - args->preset_offsets[*this->current_level - 1]);
+                eval_range = (addr == (*this->parent_range_vector)[i].end_addr
+                                       - args->preset_offsets[*this->current_level - 1]);
                 if (eval_range) return i;
             } //end for
             
@@ -264,6 +265,7 @@ void thread::thread_main(args_struct * args, proc_mem * p_mem, mem_tree * m_tree
             if (args->verbose) {
                 ui->report_thread_progress(j, 
                     (unsigned int) this->regions_to_scan.size(),
+                    *this->current_level,
                     this->human_thread_id);
             }
 

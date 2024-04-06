@@ -83,11 +83,13 @@ inline void record_value(void * value, size_t size, size_t nmemb, FILE * fs) {
 void serialise::recurse_get_next_offset(mem_node * m_node, serial_entry * s_entry,
                                         uintptr_t last_point) {
 
+
     //add offset for this node
     s_entry->offset_vector->push_back((uint32_t) m_node->node_addr - last_point);
 
-    //recurse if this is not the root node
+    //if this is not the root node
     if (m_node->parent_node != nullptr) {
+        //recurse
         this->recurse_get_next_offset(m_node->parent_node, s_entry,
                                       m_node->point_addr);
     }
@@ -119,6 +121,7 @@ void serialise::recurse_node(args_struct * args, mem_node * m_node, proc_mem * p
     maps_entry * m_obj_first_m_entry;
 
 
+    
     //if this node is not in a read & write region it is a false positive
     if (m_node->rw_regions_index == -1) return;
 
@@ -154,8 +157,10 @@ void serialise::recurse_node(args_struct * args, mem_node * m_node, proc_mem * p
         temp_s_entry.offset_vector->push_back(first_offset);
 
         //recursively traverse to root, adding offsets in the process
-        this->recurse_get_next_offset(m_node->parent_node, &temp_s_entry,
-                                      m_node->point_addr);
+        if (m_node->parent_node != nullptr) {
+            this->recurse_get_next_offset(m_node->parent_node, &temp_s_entry,
+                                          m_node->point_addr);
+        }
 
         //add this serial entry to the ptrchains vector
         this->ptrchains_vector.push_back(temp_s_entry);
@@ -262,6 +267,7 @@ void serialise::write_mem_ptrchains(args_struct * args, proc_mem * p_mem) {
         for (unsigned int j = 0; j < (unsigned int) regions_vectors[i]->size(); ++j) {
 
             //record the static region name
+            if ((*regions_vectors[i])[j].compare(0, 2, "0x")) continue;
             record_value((void *) (*regions_vectors[i])[j].c_str(), 
                          (*regions_vectors[i])[j].length(), sizeof(char), fs);
 

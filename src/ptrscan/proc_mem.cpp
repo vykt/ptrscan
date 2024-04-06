@@ -158,7 +158,8 @@ void proc_mem::populate_regions(args_struct * args) {
     //TODO add others
     const char * segment_blacklist[SEG_BLACKLIST_SIZE] = {
         "/dev",
-        "/memfd"
+        "/memfd",
+        "/run"
     };
 
     const region stack_region = { "[stack]", 0, 0 };
@@ -166,9 +167,16 @@ void proc_mem::populate_regions(args_struct * args) {
     const region bss_region = { args->target_str, 0, 0 };
 
     int ret;
-    bool extra_rw_found;
+    bool extra_rw_in_use, extra_rw_found;
     maps_entry * m_entry;
 
+
+    //check if extra_rw_vector is in use
+    if (args->extra_rw_vector.empty()) {
+        extra_rw_in_use = false;
+    } else {
+        extra_rw_in_use = true;
+    }
 
     //add standard rw regions to rw_regions_vector
     args->extra_rw_vector.insert(args->extra_rw_vector.begin(), stack_region);
@@ -201,7 +209,7 @@ void proc_mem::populate_regions(args_struct * args) {
         }
 
         //check if exhaustive rw region vector is in use
-        if (!(args->extra_rw_vector.empty())) {
+        if (extra_rw_in_use) {
             
             //for all regions in exhaustive rw region vector
             for (unsigned long int i = 0; i < args->extra_rw_vector.size(); ++i) {

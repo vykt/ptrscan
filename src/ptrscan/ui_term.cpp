@@ -59,7 +59,7 @@ inline void fill_serial_to_obj(serialise * ser, proc_mem * p_mem) {
         } else if (temp_s_entry->rw_regions_index != -1) {
 
             //unset color
-            std::cout << RESET;
+            std::cerr << RESET;
             
             //get parent object of matching static region
             ret = match_maps_obj(
@@ -119,6 +119,9 @@ inline void get_column_sizes(serialise * ser, proc_mem * p_mem,
             
             unow = (*ser->ptrchains_vector[i].offset_vector)[column_index];
             
+            //increment unow by 1 to allow the 'get length through division' to work correctly
+            if (unow == 0) unow += 1;
+
             //get length through division
             len = 0;
             while (unow != 0) {
@@ -151,7 +154,7 @@ inline void ui_term::report_exception(const std::exception& e) {
 //report when a level is finished
 inline void ui_term::report_control_progress(int level_done) {
     
-    std::cout << RED << "[ctrl]: level " << level_done << " finished.\n" << RESET;
+    std::cerr << RED << "[ctrl]: level " << level_done << " finished.\n" << RESET;
     return;
 }
 
@@ -159,13 +162,14 @@ inline void ui_term::report_control_progress(int level_done) {
 //acquire mutex & report thread progress
 inline void ui_term::report_thread_progress(unsigned int region_done, 
                                             unsigned int region_total,
+                                            unsigned int current_level,
                                             int human_thread_id) {
 
     //to avoid using mutexes here, compose the string & call std::cout once
     std::stringstream report;
-    report << "[thread " << human_thread_id << "] " << region_done << " out of "
-           << region_total << " finished.\n";
-    std::cout << report.str();
+    report << "[level: " << current_level << "] [thread " << human_thread_id << "] " 
+           << region_done << " out of " << region_total << " finished.\n";
+    std::cerr << report.str();
 
     return;
 }
@@ -277,7 +281,6 @@ void ui_term::output_serialised_results(void * args_ptr, void * serialise_ptr,
 
             //format offsets
             convert_buf.str(std::string());
-            convert_buf.clear();
             convert_buf << "0x" << std::hex << (*temp_s_entry->offset_vector)[j];
             print_buf.append(convert_buf.str());
             if ((column_sizes[j+1] - (convert_buf.str().length() - 2)) != 0) {
