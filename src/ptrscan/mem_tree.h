@@ -6,10 +6,11 @@
 
 #include <cstdint>
 
-#include <libpwu.h>
 #include <pthread.h>
+#include <libcmore.h>
+#include <liblain.h>
 
-#include "proc_mem.h"
+#include "mem.h"
 
 
 #define CHECK_RW 0
@@ -18,12 +19,8 @@
 
 
 /*
- *   We need root -> leaf traversal for construction, and leaf -> root traversal for 
- *   using the tree.
- */
-
-/*
- *   The mem_node should probably be a struct.
+ *   We need root -> leaf traversal for construction, and leaf -> root traversal 
+ *   when verifying or using the tree.
  */
 
 /* 
@@ -34,43 +31,46 @@
 //single node in tree
 class mem_node {
 
-    //attributes
+    private:
+        //attributes
+        unsigned int id;
+
+        int rw_regions_index;     //-1 if not in a rw region
+        int static_regions_index; //-1 if not in a static region
+
+        uintptr_t addr;           //where this pointer is stored
+        uintptr_t ptr_addr;       //where this pointer points to
+        
+        mem_node * parent;
+        std::list<mem_node> children;
+
     public:
-    unsigned int id;
-    int rw_regions_index;     //-1 if not in a rw region
-    int static_regions_index; //-1 if not in a static region
+        //methods
+        mem_node(uintptr_t addr, uintptr_t ptr_addr, mem_node * parent, mem * m);
 
-    uintptr_t node_addr;              //literal address of this node
-    uintptr_t point_addr;             //where this node points to
-    mem_node * parent_node;           //parents
-    std::list<mem_node> subnode_list; //children
+        void add_child(mem_node * child);
 
-
-    //methods
-    public:
-    mem_node(uintptr_t node_addr, uintptr_t point_addr,
-             mem_node * parent_node, proc_mem * p_mem);
+        mem_node * get_parent();
+        std::list<mem_node> * get_children();
 };
 
 
 //memory tree
 class mem_tree {
 
-    //attributes
     private:
-    pthread_mutex_t write_mutex;
+        //attributes
+        pthread_mutex_t write_mutex;
+        std::vector<std::list<mem_node *>> * levels; //all levels of the tree
+        const mem_node * root_node;
 
     public:
-    std::vector<std::list<mem_node *>> * levels;
-    const mem_node * root_node;
+        //methods
+        mem_tree(args_struct * args, mem * m);
+        ~mem_tree();
 
-    //methods
-    public:
-    mem_tree(args_struct * args, proc_mem * p_mem);
-    ~mem_tree();
-
-    void add_node(uintptr_t addr, uintptr_t point_addr, mem_node * parent_node, 
-                  unsigned int level, proc_mem * p_mem);
+        void add_node(uintptr_t addr, uintptr_t ptr_addr, 
+                      mem_node * parent, unsigned int level, mem * m);
 };
 
 

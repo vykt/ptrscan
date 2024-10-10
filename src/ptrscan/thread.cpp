@@ -9,16 +9,14 @@
 
 #include <unistd.h>
 
-#include <libpwu.h>
 #include <pthread.h>
+#include <libcmore.h>
+#include <liblain.h>
 
 #include "args.h"
 #include "thread.h"
 #include "mem_tree.h"
 
-
-//TODO DEBUG INCLUDES, PURGE
-#include <iostream>
 
 
 //bootstrap function
@@ -43,7 +41,7 @@ void * thread_bootstrap(void * arg_bootstrap) {
     close(real_arg->t->mem_fd);
 
     //free arguments structure on exit
-    free(arg_bootstrap);
+    delete((thread_arg *) arg_bootstrap);
 
     //exit
     pthread_exit((void *) &good_ret);
@@ -278,11 +276,59 @@ void thread::thread_main(args_struct * args, proc_mem * p_mem, mem_tree * m_tree
 
 
 
-//functions for use by thread_ctrl
+// --- PUBLIC METHODS
 
 //reset current_addr (no race condition possible)
 void thread::reset_current_addr() {
 
     this->current_addr = this->regions_to_scan[0].start_addr;
 
+}
+
+
+void link_thread(iunsigned int * current_depth, pthread_barrier_t * depth_barrier, 
+                 std::vector<parent_range> * parent_ranges) {
+
+    this->current_depth = current_depth;
+    this->depth_barrier = depth_barrier;
+    this->parent_ranges = parent_ranges;
+
+    return;
+}
+
+
+void setup_session(int ln_iface, int pid) {
+
+    const char * exception_str[1] = {
+        "thread -> setup_session: failed to open a liblain session."
+    };
+
+    int ret;
+
+    ret = ln_open(&this->session, ln_iface, pid);
+    if (ret) {
+        throw std::runtime_error(exception_str[0]);
+    }
+
+    return;
+}
+
+
+inline pthread_t * get_id() {
+    return &this->id;
+}
+
+
+inline int thread::get_ui_id() {
+    return this->ui_id;
+}
+
+
+inline void thread::set_ui_id(int ui_id) {
+    this->ui_id = ui_id;
+    return;
+}
+
+inline std::vector<vma_scan_range> * get_vma_scan_ranges() {
+    return &this->vma_scan_ranges;
 }

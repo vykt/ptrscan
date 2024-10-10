@@ -4,7 +4,8 @@
 #include <string>
 #include <vector>
 
-#include <libpwu.h>
+#include <libcmore.h>
+#include <liblain.h>
 
 
 #define UI_TERM 0
@@ -22,23 +23,18 @@
 #define MODE_SCAN 0
 #define MODE_SCAN_WRITE 1
 #define MODE_READ 2
-#define MODE_RESCAN 3
-#define MODE_RESCAN_WRITE 4
+#define MODE_VERIFY 3
+#define MODE_VERIFY_WRITE 4
 
-#define MODE_COUNT 5
-
-/*
- *  In the future, consider allowing the user to specify a custom offset, probably
- *  as an exponent of 2.
- */
+#define MODE_NUM 5
 
 
 //additional region to treat as static in addition to .bss & [stack]
 typedef struct {
 
-    std::string pathname; //backing file
-    int skip;             //if multiple regions with `pathname` backing file have
-                          //been found, skip 'skip' first regions.
+    std::string pathname; //backing object
+    int skip;             //if multiple backing objects with the [path]name have 
+                          //been found, skip first 'skip' objects.
     //internal
     int skipped;
 
@@ -48,20 +44,32 @@ typedef struct {
 //arguments passed via flags
 typedef struct {
 
-    std::string target_str;
+    //supplied by user
+    std::string target_str;    //target name (comm)
     std::string output_file;
     std::string input_file;
-    byte ui_type;
+
+    cm_byte ui_type;           //not implemented
+    int ln_iface;
+
+    bool colour;               //use colour codes in output 
     bool verbose;
     bool aligned;
-    bool use_preset_offsets;
-    uintptr_t ptr_lookback;
-    uintptr_t target_addr;
-    unsigned int levels;
-    unsigned int num_threads;
-    std::vector<region> extra_static_vector; //TODO rename to extra_static_vector
-    std::vector<region> extra_rw_vector;
-    std::vector<uintptr_t> preset_offsets;
+    bool use_preset_offsets;   //did user supply first n offsets?
+    
+    cm_byte bit_width;         //architecture bit width (32bit/64bit, etc.)
+    uintptr_t target_addr;     //root node address
+    
+    size_t max_struct_size;    //max struct size
+    unsigned int max_depth;    //max tree levels
+    unsigned int threads;      //number of worker threads to use
+    
+    std::vector<region> extra_static_regions;  //user supplied vmas to treat as static
+    std::vector<region> exclusive_rw_regions;  //user supplied vmas to exclusively scan
+    std::vector<uintptr_t> preset_offsets;     //first n offsets (if supplied)
+
+    //internal
+    std::string target_comm;
 
 } args_struct;
 

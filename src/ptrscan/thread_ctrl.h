@@ -5,40 +5,41 @@
 
 #include <cstdint>
 
-#include <libpwu.h>
 #include <pthread.h>
+#include <libcmore.h>
+#include <liblain.h>
 
 #include "args.h"
 #include "thread.h"
 #include "mem_tree.h"
-#include "proc_mem.h"
+#include "mem.h"
 
 
 //thread controller, 'global state' across threads
 class thread_ctrl {
 
-    //attributes
-    public:
-    std::vector<parent_range> parent_range_vector;
-    std::vector<thread> thread_vector;
-    pthread_barrier_t level_barrier;
-    unsigned int current_level;
-
-    //methods
     private:
-    uintptr_t get_rw_mem_sum(proc_mem * p_mem);
-    void define_regions_to_scan(args_struct * args, proc_mem * p_mem, 
-                                uintptr_t mem_sum);
+        //attributes
+        std::vector<parent_range> parent_ranges;
+        std::vector<thread> threads;
+        
+        pthread_barrier_t depth_barrier; 
+        unsigned int current_depth;
+
+    private:
+        //methods
+        uintptr_t get_rw_mem_sum(mem * m);
+        void divide_mem(args_struct * args, mem * m, uintptr_t mem_sum);
 
     public:
-    void init(args_struct * args, proc_mem * p_mem, mem_tree * m_tree, 
-              ui_base * ui, pid_t pid); 
+        //methods
+        void init(args_struct * args, mem * m, 
+                  mem_tree * m_tree, ui_base * ui, pid_t pid); 
 
-    void prepare_level(args_struct * args, proc_mem * p_mem, mem_tree * m_tree);
-    void start_level();
-    void end_level();
-
-    void wait_thread_terminate();
+        void prepare_level(args_struct * args, mem * m, mem_tree * m_tree);
+        void start_level();
+        void end_level();
+        void wait_thread_terminate();
 
 };
 

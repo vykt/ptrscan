@@ -6,7 +6,8 @@
 
 #include <cstdint>
 
-#include <libpwu.h>
+#include <libcmore.h>
+#include <liblain.h>
 
 #include "ui_base.h"
 
@@ -22,16 +23,14 @@ class ui_term : public ui_base {
 
     public:
         virtual void report_exception(const std::exception& e);
-        virtual void report_control_progress(int level_done);
-        virtual void report_thread_progress(unsigned int region_done,
-                                            unsigned int region_total,
+        virtual void report_depth_progress(int depth_done);
+        virtual void report_thread_progress(unsigned int vma_done,
+                                            unsigned int vma_total,
                                             int human_thread_id);
         
-        virtual pid_t clarify_pid(name_pid * n_pid);
+        virtual pid_t clarify_pid(cm_vector * pids);
         virtual void output_serialised_results(void * args_ptr,
-                                               void * serialise_ptr, 
-                                               void * proc_mem_ptr);
-
+                                               void * serialise_ptr, void * mem_ptr);
 };
 
 

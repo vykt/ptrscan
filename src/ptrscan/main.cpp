@@ -25,8 +25,6 @@
 //generate pointer tree
 void threaded_scan(args_struct * args, proc_mem * p_mem, 
                    mem_tree ** m_tree, ui_base * ui) {
-  
-    //TODO USE UI TO REPORT PROGRESS OF SCAN
 
     //instantiate pointer map tree
     thread_ctrl * t_ctrl;

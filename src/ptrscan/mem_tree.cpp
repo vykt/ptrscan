@@ -9,36 +9,34 @@
 #include "args.h"
 
 
-static unsigned int next_node_id = 0;
+static unsigned int _next_node_id = 0;
 
+
+// --- INTERNAL
 
 //check if address is in read & write regions, or if it is in a static region (mode)
-int check_index(uintptr_t node_addr, proc_mem * p_mem, int mode) {
+static int _check_index(uintptr_t addr, mem * m, int mode) {
 
     bool eval;
-    std::vector<maps_entry *> * mode_vector;
+
+    ln_vm_area * vma;
+    std::vector<cm_list_node *> * mode_vector;
 
 
     //get appropriate mode vector
     if (mode == CHECK_RW) {
-        mode_vector = &p_mem->rw_regions_vector;
+        mode_vector = m->get_rw_regions();
     } else if (mode == CHECK_STATIC) {
-        mode_vector = &p_mem->static_regions_vector;
+        mode_vector = m->get_static_regions();
     }
 
-    //for every static region
-    for (unsigned int i = 0; i < (unsigned int) mode_vector->size();  ++i) {
+    //for every region
+    for (int i = 0; i < mode_vector->size();  ++i) {
+
+        vma = LN_GET_NODE_AREA((*mode_vector)[i]);
 
         //check if node_addr falls in range of this static region
-        eval = (uintptr_t) (*mode_vector)[i]->start_addr
-               <= node_addr
-               && (uintptr_t) (*mode_vector)[i]->end_addr
-               > node_addr;
-
-        //if it does fall inside this static region
-        if (eval) {
-            return i;
-        }
+        if ((vma->start_addr <= addr) && (vma->end_addr > addr)) return i;
 
     } //end for
 
@@ -46,23 +44,46 @@ int check_index(uintptr_t node_addr, proc_mem * p_mem, int mode) {
 }
 
 
+// --- PUBLIC mem_node METHODS
+
 //constructor for each node
-mem_node::mem_node(uintptr_t node_addr, uintptr_t point_addr,
-                   mem_node * parent_node, proc_mem * p_mem) {
+mem_node::mem_node(uintptr_t addr, uintptr_t ptr_addr, 
+                   mem_node * parent, mem * m) {
 
-    this->id = next_node_id;
-    next_node_id++;
+    this->id = _next_node_id;
+    _next_node_id++;
 
-    this->node_addr = node_addr;
-    this->point_addr = point_addr;
-    this->rw_regions_index = check_index(node_addr, p_mem, CHECK_RW);
-    this->static_regions_index = check_index(node_addr, p_mem, CHECK_STATIC);
-    this->parent_node = parent_node;
+    this->addr                 = addr;
+    this->ptr_addr             = ptr_addr;
+    this->rw_regions_index     = _check_index(addr, m, CHECK_RW);
+    this->static_regions_index = _check_index(addr, m, CHECK_STATIC);
+    this->parent               = parent;
+
+    return;
 }
 
 
+inline void mem_node::add_child(mem_node * child) {
+    this->children.push_front(*child);
+    return;
+}
+
+
+inline mem_node * mem_node::get_parent() {
+    return this->parent;
+}
+
+
+inline std::list<mem_node> * mem_node::get_children() {
+    return &this->children;
+}
+
+
+
+// --- PUBLIC mem_tree METHODS
+
 //constructor, sets up root node of tree based on args
-mem_tree::mem_tree(args_struct * args, proc_mem * p_mem) {
+mem_tree::mem_tree(args_struct * args, mem * m) {
 
     const char * exception_str[1] = {
         "mem_tree -> constructor: failed to initialise write mutex."
@@ -71,20 +92,21 @@ mem_tree::mem_tree(args_struct * args, proc_mem * p_mem) {
     int ret;
 
     //create root node
-    this->root_node = new mem_node(args->target_addr, 0, NULL, p_mem);
+    this->root_node = new mem_node(args->target_addr, 0, nullptr, m);
 
-    //create levels vector with space for args->levels number of lists
-    this->levels = new std::vector<std::list<mem_node *>>(args->levels);
+    //create tree levels vector to store a lists of nodes at each depth level
+    this->levels = new std::vector<std::list<mem_node *>>(args->max_depth);
 
     //push the root node onto the first level
     (*this->levels)[0].push_back((mem_node *) this->root_node);
 
     //initialise the mutex
-    ret = pthread_mutex_init(&this->write_mutex, NULL);
+    ret = pthread_mutex_init(&this->write_mutex, nullptr);
     if (ret) {
         throw std::runtime_error(exception_str[0]);
     }
 
+    return;
 }
 
 
@@ -98,8 +120,8 @@ mem_tree::~mem_tree() {
 
 
 //add node to tree
-void mem_tree::add_node(uintptr_t addr, uintptr_t point_addr, mem_node * parent_node, 
-                        unsigned int level, proc_mem * p_mem) {
+void mem_tree::add_node(uintptr_t addr, uintptr_t ptr_addr, 
+                        mem_node * parent, unsigned int level, mem * m) {
 
     const char * exception_str[2] = {
         "mem_tree -> add_node: failed to acquire write lock.",
@@ -107,11 +129,14 @@ void mem_tree::add_node(uintptr_t addr, uintptr_t point_addr, mem_node * parent_
     };
 
     int ret;
+
+    std::list<mem_node> * parent_children_list;
     std::list<mem_node *> * current_level_list;
-    mem_node * pushed_mem_node;
+    mem_node * pushed_m_node;
+
 
     //define new node
-    mem_node m_node(addr, point_addr, parent_node, p_mem);
+    mem_node m_node(addr, ptr_addr, parent, m);
 
     //acquire mutex to modify tree
     ret = pthread_mutex_lock(&this->write_mutex);
@@ -120,15 +145,17 @@ void mem_tree::add_node(uintptr_t addr, uintptr_t point_addr, mem_node * parent_
     }
 
     //add new node to its parent subnode_vector
-    parent_node->subnode_list.push_front(m_node);
+    parent->add_child(&m_node);
 
+    //get parent's children list
+    parent_children_list = parent->get_children();
 
     //get meta list for current level
     current_level_list = &(*this->levels)[level];
 
     //put the just-inserted mem_node into the levels meta list
-    pushed_mem_node = &parent_node->subnode_list.front();
-    current_level_list->push_front(pushed_mem_node);
+    pushed_m_node = &parent_children_list->front();
+    current_level_list->push_front(pushed_m_node);
 
     //free mutex
     ret = pthread_mutex_unlock(&this->write_mutex);

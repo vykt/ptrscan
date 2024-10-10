@@ -9,7 +9,8 @@
 #include <unistd.h>
 
 #include <pthread.h>
-#include <libpwu.h>
+#include <libcmore.h>
+#include <liblain.h>
 
 #include "ui_term.h"
 #include "ui_base.h"

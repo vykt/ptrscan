@@ -7,29 +7,37 @@
 #include <cstring>
 #include <cstdint>
 
-#include <libpwu.h>
+#include <libcmore.h>
+#include <liblain.h>
 
 #include "args.h"
 #include "thread_ctrl.h"
 #include "thread.h"
 #include "mem_tree.h"
-#include "proc_mem.h"
+#include "mem.h"
 
 
-// --- private
+// --- PRIVATE METHODS
 
 //get total rw- memory
-uintptr_t thread_ctrl::get_rw_mem_sum(proc_mem * p_mem) {
+uintptr_t thread_ctrl::get_rw_mem_sum(mem * m) {
 
     uintptr_t mem_sum, region_size;
 
-    mem_sum = 0;
+    ln_vm_area * vma;
+    std::vector<cm_list_node *> * rw_regions;
 
-    //for every rw- memory segment
-    for (unsigned int i = 0; i < (unsigned int) p_mem->rw_regions_vector.size(); ++i) {
-        region_size = (uintptr_t) p_mem->rw_regions_vector[i]->end_addr 
-                  - (uintptr_t) p_mem->rw_regions_vector[i]->start_addr;
+    mem_sum = 0;
+    rw_regions = m->get_rw_regions();
+
+    //for every rw- vma
+    for (int i = 0; i < rw_regions->size(); ++i) {
+        
+        vma = LN_GET_NODE_AREA((*rw_regions)[i]);
+        region_size = vma->end_addr - vma->start_addr;
+        
         mem_sum += region_size;
+    
     } //end for
 
     return mem_sum;
@@ -38,80 +46,86 @@ uintptr_t thread_ctrl::get_rw_mem_sum(proc_mem * p_mem) {
 
 
 //define the regions a thread must scan
-void thread_ctrl::define_regions_to_scan(args_struct * args, proc_mem * p_mem, 
-                                         uintptr_t mem_sum) {
+void thread_ctrl::divide_mem(args_struct * args, mem * m, uintptr_t mem_sum) {
     
-    int reg_ind;
+    int region_index;
     uintptr_t mem_share, temp_share;
     uintptr_t region_progress, region_size, region_left;
     uintptr_t fwd_min, fwd_max;
 
-    mem_range temp_range;
+    vma_scan_range temp_range;
+
+    std::vector<cm_list_node *> * rw_regions;
+    std::vector<vma_scan_range> * vma_scan_ranges;
+    ln_vm_area * vma;
 
     //assign shares
-    mem_share = mem_sum / args->num_threads;
-    reg_ind = region_progress = region_size = region_left = 0;
+    mem_share = mem_sum / args->threads;
+    region_index = region_progress = region_size = region_left = 0;
     fwd_min = 0;
-    fwd_max = sizeof(uintptr_t);
+    fwd_max = args->bit_width;
+
+
+    rw_regions = m->get_rw_regions();
 
     //for every thread
-    for (unsigned int i = 0; i < args->num_threads; ++i) {
-        
+    for (unsigned int i = 0; i < args->threads; ++i) {
+
+        //setup iteration for this thread
+        vma_scan_ranges = this->threads[i].get_vma_scan_ranges();
+
         //check if this is the last thread, it gets the rest of the remaining memory
-        if (i == args->num_threads - 1) {
+        if (i == args->threads - 1) {
             temp_share = mem_sum;
         //otherwise assign mem_share worth of memory
         } else {
             temp_share = mem_share;
         }
 
-        //while there is still memory that needs to be assigned to the current thread
+        //while there is still vmas that needs to be assigned to the current thread
         while (temp_share != 0) {
+
+            vma = LN_GET_NODE_AREA((*rw_regions)[region_index]);
 
             //zero out the mem_range temp buffer
             memset(&temp_range, 0, sizeof(temp_range));
 
-            //get current memory region size & last thread share's progress through it
-            region_size = (uintptr_t) p_mem->rw_regions_vector[reg_ind]->end_addr
-                          - (uintptr_t) p_mem->rw_regions_vector[reg_ind]->start_addr;
+            //get current region's size & last thread's progress through it
+            region_size = vma->end_addr - vma->start_addr;
             region_left = region_size - region_progress;
             
             //if remainder of region is greater than what is left of this thread share
             if (region_left > temp_share) {
                 
-                //bring up temp_share to a ptr boundary, this should NOT segfault
-                if (temp_share % sizeof(uintptr_t) != 0) {
-                    temp_share += sizeof(uintptr_t) 
-                    - (temp_share % sizeof(uintptr_t));
+                //bring up temp_share to a region boundary
+                if (temp_share % args->bit_width != 0) {
+                    temp_share += args->bit_width - (temp_share % args->bit_width);
                 }
 
-                //create new mem_range entry for current thread
-                temp_range.m_entry = p_mem->rw_regions_vector[reg_ind];
-                temp_range.start_addr = (uintptr_t) 
-                                        p_mem->rw_regions_vector[reg_ind]->start_addr
-                                        + region_progress;
-                temp_range.end_addr = temp_range.start_addr + temp_share;
+                //create new vma_scan_range entry for current thread
+                temp_range.vma_node   = (*rw_regions)[region_index];
+                temp_range.start_addr = vma->start_addr + region_progress;
+                temp_range.end_addr   = temp_range.start_addr + temp_share;
 
                 //record progress through current region
                 region_progress += temp_share;
 
                 //get bytes left in this region
-                region_left = (uintptr_t) temp_range.m_entry->end_addr
-                              - temp_range.end_addr;
+                region_left = vma->end_addr - temp_range.end_addr;
 
                 //check if incrementing temp_share to reach a pointer boundary makes 
                 //it reach the end of the current region
                 if (!region_left) {
-                    reg_ind++;
+                    region_index++;
                     region_progress = 0;
-                //otherwise let this thread region scan up to sizeof(uintptr_t) bytes
-                //ahead to scan gaps between thread shares during unaligned scans
+                //otherwise let this thread region scan up to bit_width bytes
+                //ahead to scan gaps between thread shares
                 } else {
                     temp_range.end_addr += std::clamp(region_left, fwd_min, fwd_max);
                 }
 
-                //add region to thread
-                this->thread_vector[i].regions_to_scan.push_back(temp_range);
+                //add scan region to thread
+                vma_scan_ranges->push_back(temp_range);
                 mem_sum -= temp_share;
 
                 //set temp_share to 0 to continue onto the next thread share
@@ -124,20 +138,17 @@ void thread_ctrl::define_regions_to_scan(args_struct * args, proc_mem * p_mem,
                 temp_share -= region_left;
 
                 //create new mem_range entry for current thread
-                temp_range.m_entry = p_mem->rw_regions_vector[reg_ind];
-                temp_range.start_addr = (uintptr_t)
-                                        p_mem->rw_regions_vector[reg_ind]->start_addr
-                                        + region_progress;
-                temp_range.end_addr = (uintptr_t)
-                                      p_mem->rw_regions_vector[reg_ind]->end_addr;
+                temp_range.vma_node = (*rw_regions)[region_index];
+                temp_range.start_addr = vma->start_addr + region_progress;
+                temp_range.end_addr = vma->end_addr;
 
-                //add region to thread
-                this->thread_vector[i].regions_to_scan.push_back(temp_range);
+                //add scan region to thread
+                vma_scan_ranges->push_back(temp_range);
                 mem_sum -= region_left;
 
                 //move onto next region
                 region_progress = 0;
-                reg_ind++;
+                region_index++;
 
            } //end if-else
         } //end while
@@ -145,21 +156,20 @@ void thread_ctrl::define_regions_to_scan(args_struct * args, proc_mem * p_mem,
 }
 
 
-// --- public
+// --- PUBLIC METHODS
 
 //initialise thread controller & spawn threads
-void thread_ctrl::init(args_struct * args, proc_mem * p_mem, 
-                       mem_tree * m_tree, ui_base * ui, pid_t pid) {
+void thread_ctrl::init(args_struct * args, mem * m, 
+                       mem_tree * m_tree, ui_base * ui, int pid) {
 
-    const char * exception_str[4] = { 
-        "thread_ctrl -> init: pthread_barrier_init() failed",
-        "thread_ctrl -> init: failed to open fd on proc mem for thread",
-        "thread_ctrl -> init: failed to malloc() thread arguments",
-        "thread_ctrl -> init: pthread_create() failed"
+    const char * exception_str[3] = { 
+        "thread_ctrl -> init: pthread_barrier_init() failed.",
+        "thread_ctrl -> init: failed to open a liblain session for this thread.",
+        "thread_ctrl -> init: pthread_create() failed."
     };
 
     int ret;
-    int next_human_thread_id;
+    int next_ui_id;
     uintptr_t mem_sum;
 
     thread_arg * t_arg;
@@ -167,65 +177,61 @@ void thread_ctrl::init(args_struct * args, proc_mem * p_mem,
 
 
     //setup human readable thread ids
-    next_human_thread_id = 1;
+    next_ui_id = 1;
 
     //set current level to 0 (root node)
-    this->current_level = 0;
+    this->current_depth = 0;
 
-    //initialise thread level barrier, +1 since main thread handles control
-    ret = pthread_barrier_init(&this->level_barrier, NULL, args->num_threads+1);
+    //initialise thread synchronisation, +1 to include main thread
+    ret = pthread_barrier_init(&this->depth_barrier, nullptr, args->threads+1);
     if (ret != 0) {
         throw std::runtime_error(exception_str[0]);
     }
 
-    //get memory sum
-    mem_sum = get_rw_mem_sum(p_mem);
+    //get total size of memory to scan
+    mem_sum = get_rw_mem_sum(m);
 
     //instantiate thread objects
-    for (unsigned int i = 0; i < args->num_threads; ++i) {
+    for (unsigned int i = 0; i < args->threads; ++i) {
        
-        //set human thread id
-        t_temp.human_thread_id = next_human_thread_id;
-        t_temp.current_level = &this->current_level;
-        next_human_thread_id += 1;
+        //set human readable thread id
+        t_temp.set_ui_id(next_ui_id);
+        next_ui_id++;
 
-        //setup links to controller
-        t_temp.level_barrier = &this->level_barrier;
-        t_temp.parent_range_vector = &this->parent_range_vector;
+        //link thread to thread_ctrl
+        t_temp.link_thread(next_ui_id, &this->current_depth,
+                           &this->depth_barrier, &this->parent_ranges);
         
-        //open file descriptor on proc mem for this thread
-        ret = open_memory(pid, NULL, &t_temp.mem_fd);
+        //open a liblain session for this thread
+        t_temp.setup_session(args->ln_iface, pid);
         if (ret == -1) {
             throw std::runtime_error(exception_str[1]);
         }
 
         //push new thread object
-        this->thread_vector.push_back(t_temp);
+        this->threads.push_back(t_temp);
     }
 
     //define memory regions each thread will scan
-    define_regions_to_scan(args, p_mem, mem_sum);
+    divide_mem(args, m, mem_sum);
 
     //spawn each thread
-    for (unsigned int i = 0; i < this->thread_vector.size(); ++i) { 
+    for (int i = 0; i < this->threads.size(); ++i) { 
 
         //setup args structure for new thread (deallocated by thread on exit)
-        t_arg = (thread_arg *) malloc(sizeof(thread_arg));
-        if (!t_arg) {
-            throw std::runtime_error(exception_str[2]);
-        }
+        t_arg = new(thread_arg);
 
+        t_arg->t = &this->threads[i];
         t_arg->args = args;
-        t_arg->p_mem = p_mem;
+        t_arg->m = m;
         t_arg->m_tree = m_tree;
         t_arg->ui = ui;
-        t_arg->t = &this->thread_vector[i];
 
         //create thread
-        ret = pthread_create(&this->thread_vector[i].id, NULL,
-                              &thread_bootstrap, (void *) t_arg);
+        ret = pthread_create(this->threads[i].get_id(), nullptr,
+                             &thread_bootstrap, (void *) t_arg);
         if (ret != 0) {
-            throw std::runtime_error(exception_str[3]);
+            throw std::runtime_error(exception_str[2]);
         }
     }
 }
