@@ -6,9 +6,8 @@
 #include "ui_base.h"
 #include "ui_term.h"
 #include "args.h"
-#include "proc_mem.h"
+#include "mem.h"
 #include "thread_ctrl.h"
-#include "thread.h"
 #include "mem_tree.h"
 #include "serialise.h"
 #include "verify.h"
@@ -23,26 +22,25 @@
 
 
 //generate pointer tree
-void threaded_scan(args_struct * args, proc_mem * p_mem, 
-                   mem_tree ** m_tree, ui_base * ui) {
+void threaded_scan(args_struct * args, mem * m, mem_tree ** m_tree, ui_base * ui) {
 
     //instantiate pointer map tree
     thread_ctrl * t_ctrl;
-    (*m_tree) = new mem_tree(args, p_mem);
+    (*m_tree) = new mem_tree(args, m);
 
     //initialise the thread controller
     t_ctrl = new thread_ctrl();
-    t_ctrl->init(args, p_mem, *m_tree, ui, p_mem->pid);
+    t_ctrl->init(args, m, *m_tree, ui);
 
     #ifdef DEBUG
     dump_structures_thread_work(t_ctrl);
     #endif
 
     //for every level
-    for (unsigned int i = 1; i < args->levels; ++i) {
+    for (unsigned int i = 1; i < args->max_depth; ++i) {
         
         //prepare the next level
-        t_ctrl->prepare_level(args, p_mem, *m_tree);
+        t_ctrl->prepare_threads(args, m, *m_tree);
 
         //start next level
         t_ctrl->start_level();
@@ -52,7 +50,7 @@ void threaded_scan(args_struct * args, proc_mem * p_mem,
 
         //report end of level
         if (args->verbose) {
-            ui->report_control_progress(i);
+            ui->report_depth_progress(i);
         }
 
         #ifdef DEBUG

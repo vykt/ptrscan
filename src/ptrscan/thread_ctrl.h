@@ -28,19 +28,19 @@ class thread_ctrl {
 
     private:
         //methods
-        uintptr_t get_rw_mem_sum(mem * m);
-        void divide_mem(args_struct * args, mem * m, uintptr_t mem_sum);
+        const uintptr_t get_rw_mem_sum(const mem * m);
+        void divide_mem(const args_struct * args, 
+                        const mem * m, const uintptr_t mem_sum);
 
     public:
         //methods
-        void init(args_struct * args, mem * m, 
-                  mem_tree * m_tree, ui_base * ui, pid_t pid); 
-
-        void prepare_level(args_struct * args, mem * m, mem_tree * m_tree);
+        thread_ctrl(const args_struct * args, const mem * m, 
+                    const mem_tree * m_tree, ui_base * ui); 
+        ~thread_ctrl();
+        
+        void prepare_threads(args_struct * args, mem * m, mem_tree * m_tree);
         void start_level();
         void end_level();
-        void wait_thread_terminate();
-
 };
 
 

@@ -69,8 +69,8 @@ static uintptr_t _process_int_argument(const char * argument,
 
 
 //process offsets
-static inline void _process_offsets(args_struct * args, char * offsets, 
-                             const char * _exception_str) {
+static inline void _process_offsets(args_struct * args, const char * offsets, 
+                                    const char * _exception_str) {
 
     const char * exception_str[1] {
         "process_offsets: failed to convert offset to uintptr_t."
@@ -86,7 +86,7 @@ static inline void _process_offsets(args_struct * args, char * offsets,
         throw std::runtime_error(_exception_str);
     }
 
-    next_offset_str = offsets;
+    next_offset_str = (char *) offsets;
 
     //for every offset
     do {
@@ -109,7 +109,7 @@ static inline void _process_offsets(args_struct * args, char * offsets,
 
 //process complex extra static regions argument (-s, --extra-static-regions)
 static void _process_regions(std::vector<region> * region_vector, 
-                             char * regions, const char * exception_str_) {
+                             const char * regions, const char * exception_str_) {
 
     //exception(s) for incorrect internal format of static regions
     const char * exception_str[1] {
@@ -129,7 +129,7 @@ static void _process_regions(std::vector<region> * region_vector,
     }
 
     //init
-    next_region_str = regions;
+    next_region_str = (char *) regions;
 
     //for every region
     do {

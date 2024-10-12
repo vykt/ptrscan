@@ -18,121 +18,105 @@
 #include "mem_tree.h"
 
 
+static int _good_ret = 0;
+static int _bad_ret = -1;
+
+
+// --- EXTERNAL
 
 //bootstrap function
-void * thread_bootstrap(void * arg_bootstrap) {
-
-    int good_ret = 0;
-    int bad_ret = -1;
+void * thread_bootstrap(void * arg) {
 
     //cast to correct type
-    thread_arg * real_arg = (thread_arg *) arg_bootstrap;
+    thread_arg * cast_arg = (thread_arg *) arg;
 
-    //call thread_main
+    //call thread_main & release session on return
     try {
-        real_arg->t->thread_main(real_arg->args, real_arg->p_mem, real_arg->m_tree,
-                                 real_arg->ui);
+        cast_arg->t->thread_main(cast_arg->args, cast_arg->m, 
+                                 cast_arg->m_tree, cast_arg->ui);
+        cast_arg->t->release_session();
+
     } catch (std::runtime_error& e) {
-        real_arg->ui->report_exception(e); //TODO this will cause a segfault if it runs
-        pthread_exit((void *) &bad_ret);
+        cast_arg->ui->report_exception(e); //TODO segfault?
+        pthread_exit((void *) &_bad_ret);
     }
 
-    //close descriptor
-    close(real_arg->t->mem_fd);
-
     //free arguments structure on exit
-    delete((thread_arg *) arg_bootstrap);
+    delete((thread_arg *) arg);
 
     //exit
-    pthread_exit((void *) &good_ret);
+    pthread_exit((void *) &_good_ret);
 }
 
 
-/*
- *  the efficiency of reading can probably be improved with a circular buffer
- */
+// --- PRIVATE METHODS
 
-//read the next buffer while allowing for unaligned pointer scanning across 
-//buffer boundaries
-ssize_t inline thread::get_next_buffer_smart(byte * mem_buf, ssize_t read_left, 
-                                            ssize_t read_last, bool first_region_read) {
+//read the next buffer in a way that still scans for pointers across buffer and 
+//region boundaries
+ssize_t inline thread::get_next_buffer_smart(const args_struct * args, 
+                                             read_state * r_state, 
+                                             cm_byte * read_buf, 
+                                             const uintptr_t read_addr, 
+                                             const bool region_first_read) {
 
-    const char * exception_str[2] = {
+    const char * exception_str[1] = {
         "thread -> get_next_buffer_smart: memory read into buffer failed."
-        "thread -> get_next_buffer_smart: failsafe memory read into buffer failed."
     };
 
+    int ret;
+
     ssize_t min, max;
-    ssize_t read_bytes, read_bytes_failsafe, to_read, read_buf_effective_size;
+    ssize_t read_final_size, read_buf_effective_size;
+
 
     //if first read of this region, read the entire buffer
-    if (first_region_read) {
+    if (region_first_read) {
+        
         read_buf_effective_size = READ_BUF_SIZE;
-        memset(mem_buf, 0, read_buf_effective_size);
+        memset(read_buf, 0, read_buf_effective_size);
+    
     //else copy end of last buffer to the start of next buffer
     } else {
-        read_buf_effective_size = READ_BUF_SIZE - sizeof(uintptr_t);
-        memcpy(mem_buf, mem_buf+(read_last - sizeof(uintptr_t)), 
-               sizeof(uintptr_t));
-        memset(mem_buf + sizeof(uintptr_t), 0, read_buf_effective_size);
+
+        read_buf_effective_size = READ_BUF_SIZE - args->bit_width;
+        
+        memcpy(read_buf, read_buf+(r_state->last - args->bit_width), args->bit_width);
+        memset(read_buf + args->bit_width, 0, read_buf_effective_size);
     }
      
     //get read target size
     min = 0;
     max = read_buf_effective_size;
-    to_read = std::clamp(read_left, min, max);
+    read_final_size = std::clamp(r_state->left, min, max);
 
-    //read up to read_buf_effective_size bytes (if scheduler is kind)
-    read_bytes = read(this->mem_fd, mem_buf, to_read);
-    if (read_bytes == -1) {
-        perror("[ERRNO]"); //TODO TEMPORARY
+    ret = ln_read(&this->session, read_addr, read_buf, read_final_size);
+    if (ret) {
         throw std::runtime_error(exception_str[0]);
     }
 
-    /*
-     *  From my testing, calling read() on /proc/<pid>/mem should always return the 
-     *  full requested amount up to requests of around 0x16000. As such, this next 
-     *  call should effectively never take place. Nontheless, it is here as a 
-     *  failsafe.
-     *
-     *  Ensuring the read buffer is sizeof(uintptr_t) aligned simplies everything.
-     */
-
-    //call read again to align buffer if necessary
-    if (read_bytes % sizeof(uintptr_t)) {
-        read_bytes_failsafe = read(this->mem_fd, mem_buf+read_bytes,
-                                   read_bytes % sizeof(uintptr_t));
-        if (read_bytes_failsafe == -1) {
-            perror("[ERRNO]"); //TODO TEMPORARY
-            throw std::runtime_error(exception_str[1]);
-        }
-        read_bytes += read_bytes_failsafe;
-    }
-
-    return read_bytes;
+    return read_final_size;
 }
 
 
 
-//thread class
+// --- PUBLIC METHODS
 
 //compare current address to parent nodes
-int thread::addr_parent_compare(uintptr_t addr, args_struct * args) {
+int thread::addr_parent_compare(const args_struct * args, const uintptr_t addr) {
 
-    bool eval_range;
-
-    
+    bool eval_range;    
 
     //check if preset offsets are in use
     if (args->use_preset_offsets) {
         
         //check if a preset offset was supplied for this depth level
-        if ( (long int) args->preset_offsets[*this->current_level - 1] != -1) {
+        if ( (long int) args->preset_offsets[*this->current_depth - 1] != -1) {
 
             //for every parent region
-            for (unsigned int i = 0; i < (unsigned int) this->parent_range_vector->size(); ++i) {
+            for (int i = 0; i < this->parent_ranges->size(); ++i) {
 
-                eval_range = (addr == (*this->parent_range_vector)[i].end_addr - args->preset_offsets[*this->current_level - 1]);
+                eval_range = (addr == (*this->parent_ranges)[i].end_addr
+                              - args->preset_offsets[*this->current_depth - 1]);
                 if (eval_range) return i;
             } //end for
             
@@ -140,18 +124,14 @@ int thread::addr_parent_compare(uintptr_t addr, args_struct * args) {
             return -1;
         }
     }
-    
-    /*  NOTE: This next section can't be placed in an else statement, as failure of either of
-     *        the first two if statements has to default into this next section.
-     */
 
-    //otherwise, accept any offset under args->lookback
+    //otherwise, accept any offset under args->max_struct_size
     
     //for every parent region
-    for (unsigned int i = 0; i < (unsigned int) this->parent_range_vector->size(); ++i) {
+    for (int i = 0; i < this->parent_ranges->size(); ++i) {
 
-        eval_range = addr >= (*this->parent_range_vector)[i].start_addr
-                     && addr <= (*this->parent_range_vector)[i].end_addr;
+        eval_range = addr >= (*this->parent_ranges)[i].start_addr
+                     && addr <= (*this->parent_ranges)[i].end_addr;
 
         if (eval_range) return i;
     } //end for
@@ -162,98 +142,86 @@ int thread::addr_parent_compare(uintptr_t addr, args_struct * args) {
 
 
 //main loop for each thread
-void thread::thread_main(args_struct * args, proc_mem * p_mem, mem_tree * m_tree,
-                         ui_base * ui) {
+void thread::thread_main(const args_struct * args, const mem * m, 
+                         mem_tree * m_tree, ui_base * ui) {
 
-    const char * exception_str[2] = {
-        "thread -> thread_main: failed to seek to start of region.",
+    const char * exception_str[1] = {
         "thread -> thread_main: memory read into local buffer failed."
     };
 
     int ret, parent_index;
-
-    ssize_t read_left, read_last, read_total;
-
     uintptr_t read_addr, potential_ptr_addr;
-    bool first_region_read;
 
-    byte mem_buf[READ_BUF_SIZE];
+    read_state r_state;
+    
+    bool region_first_read;
+
+    cm_byte read_buf[READ_BUF_SIZE];
     unsigned int buffer_increment;
 
 
     //set buffer_increment to aligned (sizeof(uintptr_t)) or unaligned (1)
     if (args->aligned) {
-        buffer_increment = sizeof(uintptr_t);
+        buffer_increment = args->bit_width;
     } else {
         buffer_increment = 1;
     }
 
 
     //for every level in the tree (start at 1, 0 is root)
-    for (unsigned int i = 1; i < args->levels; ++i) {
+    for (unsigned int i = 1; i < args->max_depth; ++i) {
 
         //wait for thread_ctrl->start_level()
-        pthread_barrier_wait(this->level_barrier);
+        pthread_barrier_wait(this->depth_barrier);
 
-        //for every region this thread needs to scan
-        for (unsigned int j = 0; j < (unsigned int) this->regions_to_scan.size(); ++j) {
+        //for every range this thread needs to scan
+        for (int j = 0; j < this->vma_scan_ranges.size(); ++j) {
 
-            /*
-             *  not reading with libpwu to avoid calling lseek
-             */
-
-            //seek to start of region
-            ret = (off_t) lseek(this->mem_fd, this->regions_to_scan[j].start_addr,
-                                SEEK_SET);
-            if (ret == -1) {
-                throw std::runtime_error(exception_str[0]);
-            }
-
-            //get size of region
-            read_left = read_total = this->regions_to_scan[j].end_addr
-                                     - this->regions_to_scan[j].start_addr;
+            //setup read state
+            r_state.done = r_state.last = 0;
+            r_state.left = r_state.total = this->vma_scan_ranges[j].end_addr
+                                           - this->vma_scan_ranges[j].start_addr;
 
             //reset misc variables
-            read_addr = this->regions_to_scan[j].start_addr;
-            first_region_read = true;
-            read_last = 0;
+            read_addr     = this->vma_scan_ranges[j].start_addr;
+            region_first_read = true;
 
             //read while not done with region
-            while (read_left != 0) {
+            while (r_state.left != 0) {
 
                 //get the next buffer
-                read_last = this->get_next_buffer_smart(mem_buf, read_left, read_last, 
-                                                        first_region_read);
-                read_left -= read_last;
+                r_state.last = this->get_next_buffer_smart(args, &r_state, 
+                                                           read_buf, read_addr, 
+                                                           region_first_read);
+                r_state.left -= r_state.last;
+                r_state.done += r_state.last;
 
                 //for every aligned / unaligned pointer
-                for (int k = 0; k < read_last; k += buffer_increment) {
+                for (int k = region_first_read ? 0 : buffer_increment; 
+                     k < r_state.last; k += buffer_increment) {
 
                     //convert value to ptr
-                    potential_ptr_addr = *((uintptr_t *) (mem_buf + k));
+                    potential_ptr_addr = *((uintptr_t *) (read_buf + k));
                     
                     //see if ptr points to any parent
-                    parent_index = this->addr_parent_compare(potential_ptr_addr,
-                                                             args);
+                    parent_index = this->addr_parent_compare(args, potential_ptr_addr);
 
                     //if no match found, continue to next pointer
                     if (parent_index == -1) continue;
 
                     //otherwise, add new node
-                    m_tree->add_node(
-                            read_addr + k,
-                            potential_ptr_addr,
-                            (*this->parent_range_vector)[parent_index].parent_node,
-                            i,
-                            p_mem);
+                    m_tree->add_node(read_addr + k, potential_ptr_addr, 
+                                     this->vma_scan_ranges[j].vma_node,
+                                     (*this->parent_ranges)[parent_index].parent_node,
+                                     i, m);
 
                 } //end for every aligned / unaligned pointer
  
-                //increment current address accordingly
-                if (first_region_read) {
-                    first_region_read = false;
-                }
-                read_addr += read_last;
+                //increment next read address
+                read_addr += r_state.last;
+
+                //unset first read
+                region_first_read = false;
 
             } //end while
 
@@ -261,34 +229,32 @@ void thread::thread_main(args_struct * args, proc_mem * p_mem, mem_tree * m_tree
             //report progress for thread
             if (args->verbose) {
                 ui->report_thread_progress(j, 
-                    (unsigned int) this->regions_to_scan.size(),
-                    this->human_thread_id);
+                    (unsigned int) this->vma_scan_ranges.size(), this->ui_id);
             }
 
         } //end for every region
 
 
         //wait for thread_ctrl->end_level()
-        pthread_barrier_wait(this->level_barrier);
+        pthread_barrier_wait(this->depth_barrier);
 
     } //end for every level
 }
 
 
-
-// --- PUBLIC METHODS
-
 //reset current_addr (no race condition possible)
 void thread::reset_current_addr() {
 
-    this->current_addr = this->regions_to_scan[0].start_addr;
+    this->current_addr = this->vma_scan_ranges[0].start_addr;
 
 }
 
 
-void link_thread(iunsigned int * current_depth, pthread_barrier_t * depth_barrier, 
-                 std::vector<parent_range> * parent_ranges) {
+void thread::link_thread(const int ui_id, unsigned int * current_depth, 
+                         pthread_barrier_t * depth_barrier, 
+                         std::vector<parent_range> * parent_ranges) {
 
+    this->ui_id         = ui_id;
     this->current_depth = current_depth;
     this->depth_barrier = depth_barrier;
     this->parent_ranges = parent_ranges;
@@ -297,7 +263,7 @@ void link_thread(iunsigned int * current_depth, pthread_barrier_t * depth_barrie
 }
 
 
-void setup_session(int ln_iface, int pid) {
+void thread::setup_session(const int ln_iface, const pid_t pid) {
 
     const char * exception_str[1] = {
         "thread -> setup_session: failed to open a liblain session."
@@ -314,12 +280,29 @@ void setup_session(int ln_iface, int pid) {
 }
 
 
-inline pthread_t * get_id() {
+void thread::release_session() {
+
+    const char * exception_str[1] = {
+        "thread -> release_session: failed to release a liblain session."
+    };
+
+    int ret;
+
+    ret = ln_close(&this->session);
+    if (ret) {
+        throw std::runtime_error(exception_str[0]);
+    }
+
+    return;
+}
+
+
+inline pthread_t * thread::get_id() {
     return &this->id;
 }
 
 
-inline int thread::get_ui_id() {
+inline const int thread::get_ui_id() const {
     return this->ui_id;
 }
 
@@ -329,6 +312,7 @@ inline void thread::set_ui_id(int ui_id) {
     return;
 }
 
-inline std::vector<vma_scan_range> * get_vma_scan_ranges() {
-    return &this->vma_scan_ranges;
+inline void thread::add_vma_scan_range(vma_scan_range range) {
+    this->vma_scan_ranges.push_back(range);
+    return;
 }

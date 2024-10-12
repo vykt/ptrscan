@@ -20,12 +20,12 @@
 // --- PRIVATE METHODS
 
 //get total rw- memory
-uintptr_t thread_ctrl::get_rw_mem_sum(mem * m) {
+const uintptr_t thread_ctrl::get_rw_mem_sum(const mem * m) {
 
     uintptr_t mem_sum, region_size;
 
     ln_vm_area * vma;
-    std::vector<cm_list_node *> * rw_regions;
+    const std::vector<cm_list_node *> * rw_regions;
 
     mem_sum = 0;
     rw_regions = m->get_rw_regions();
@@ -46,21 +46,22 @@ uintptr_t thread_ctrl::get_rw_mem_sum(mem * m) {
 
 
 //define the regions a thread must scan
-void thread_ctrl::divide_mem(args_struct * args, mem * m, uintptr_t mem_sum) {
+void thread_ctrl::divide_mem(const args_struct * args, 
+                             const mem * m, const uintptr_t mem_sum) {
     
     int region_index;
-    uintptr_t mem_share, temp_share;
+    uintptr_t mem_left, mem_share, temp_share;
     uintptr_t region_progress, region_size, region_left;
     uintptr_t fwd_min, fwd_max;
 
     vma_scan_range temp_range;
 
-    std::vector<cm_list_node *> * rw_regions;
-    std::vector<vma_scan_range> * vma_scan_ranges;
+    const std::vector<cm_list_node *> * rw_regions;
     ln_vm_area * vma;
 
     //assign shares
-    mem_share = mem_sum / args->threads;
+    mem_left = mem_sum;
+    mem_share = mem_left / args->threads;
     region_index = region_progress = region_size = region_left = 0;
     fwd_min = 0;
     fwd_max = args->bit_width;
@@ -71,12 +72,9 @@ void thread_ctrl::divide_mem(args_struct * args, mem * m, uintptr_t mem_sum) {
     //for every thread
     for (unsigned int i = 0; i < args->threads; ++i) {
 
-        //setup iteration for this thread
-        vma_scan_ranges = this->threads[i].get_vma_scan_ranges();
-
         //check if this is the last thread, it gets the rest of the remaining memory
         if (i == args->threads - 1) {
-            temp_share = mem_sum;
+            temp_share = mem_left;
         //otherwise assign mem_share worth of memory
         } else {
             temp_share = mem_share;
@@ -125,8 +123,8 @@ void thread_ctrl::divide_mem(args_struct * args, mem * m, uintptr_t mem_sum) {
                 }
 
                 //add scan region to thread
-                vma_scan_ranges->push_back(temp_range);
-                mem_sum -= temp_share;
+                this->threads[i].add_vma_scan_range(temp_range);
+                mem_left -= temp_share;
 
                 //set temp_share to 0 to continue onto the next thread share
                 temp_share = 0;
@@ -143,8 +141,8 @@ void thread_ctrl::divide_mem(args_struct * args, mem * m, uintptr_t mem_sum) {
                 temp_range.end_addr = vma->end_addr;
 
                 //add scan region to thread
-                vma_scan_ranges->push_back(temp_range);
-                mem_sum -= region_left;
+                this->threads[i].add_vma_scan_range(temp_range);
+                mem_left -= region_left;
 
                 //move onto next region
                 region_progress = 0;
@@ -159,8 +157,8 @@ void thread_ctrl::divide_mem(args_struct * args, mem * m, uintptr_t mem_sum) {
 // --- PUBLIC METHODS
 
 //initialise thread controller & spawn threads
-void thread_ctrl::init(args_struct * args, mem * m, 
-                       mem_tree * m_tree, ui_base * ui, int pid) {
+thread_ctrl::thread_ctrl(const args_struct * args, const mem * m, 
+                         const mem_tree * m_tree, ui_base * ui) {
 
     const char * exception_str[3] = { 
         "thread_ctrl -> init: pthread_barrier_init() failed.",
@@ -170,11 +168,12 @@ void thread_ctrl::init(args_struct * args, mem * m,
 
     int ret;
     int next_ui_id;
-    uintptr_t mem_sum;
+
+    //get total amount of rw-/rwx memory
+    const uintptr_t mem_sum = get_rw_mem_sum(m);
 
     thread_arg * t_arg;
     thread t_temp;
-
 
     //setup human readable thread ids
     next_ui_id = 1;
@@ -188,9 +187,6 @@ void thread_ctrl::init(args_struct * args, mem * m,
         throw std::runtime_error(exception_str[0]);
     }
 
-    //get total size of memory to scan
-    mem_sum = get_rw_mem_sum(m);
-
     //instantiate thread objects
     for (unsigned int i = 0; i < args->threads; ++i) {
        
@@ -203,7 +199,7 @@ void thread_ctrl::init(args_struct * args, mem * m,
                            &this->depth_barrier, &this->parent_ranges);
         
         //open a liblain session for this thread
-        t_temp.setup_session(args->ln_iface, pid);
+        t_temp.setup_session(args->ln_iface, m->get_pid());
         if (ret == -1) {
             throw std::runtime_error(exception_str[1]);
         }
@@ -222,9 +218,9 @@ void thread_ctrl::init(args_struct * args, mem * m,
         t_arg = new(thread_arg);
 
         t_arg->t = &this->threads[i];
-        t_arg->args = args;
-        t_arg->m = m;
-        t_arg->m_tree = m_tree;
+        t_arg->args = (args_struct *) args;
+        t_arg->m = (mem *) m;
+        t_arg->m_tree = (mem_tree *) m_tree;
         t_arg->ui = ui;
 
         //create thread
@@ -237,73 +233,74 @@ void thread_ctrl::init(args_struct * args, mem * m,
 }
 
 
-//setup threads for next level scan
-void thread_ctrl::prepare_level(args_struct * args, proc_mem * p_mem, 
-                                mem_tree * m_tree) {
+//setup threads for next iteration
+void thread_ctrl::prepare_threads(args_struct * args, mem * m, mem_tree * m_tree) {
 
     const char * exception_str[1] = {
-        "thread_ctrl -> prepare_level: get_region_by_addr() didn't succeed for parent."
+        "thread_ctrl -> prepare_level: ln_get_area_offset returned -1. Impossible?"
     };
 
     int ret;
+    unsigned int min, max, off;
+    uintptr_t allowed_struct_size;
+    
+    cm_list_node * vma_node;
+    ln_vm_area * vma;
+
     parent_range temp_parent_range;
     std::list<mem_node *> * level_list;
 
-    uintptr_t allowed_lookback;
-    maps_entry * matched_m_entry;
-    unsigned int matched_m_offset;
-
-    unsigned int min, max;
-
-
 
     //increment current level
-    this->current_level += 1;
+    this->current_depth += 1;
 
     //reset current_addr for each thread
-    for (unsigned int i = 0; i < (unsigned int) this->thread_vector.size(); ++i) {
-        this->thread_vector[i].reset_current_addr();
+    for (int i = 0; i < this->threads.size(); ++i) {
+        this->threads[i].reset_current_addr();
     }
 
     //erase parent_range_vector
-    this->parent_range_vector.erase(parent_range_vector.begin(),
-                                    parent_range_vector.end());
+    this->parent_ranges.erase(parent_ranges.begin(), parent_ranges.end());
 
     
     //re-create parent_range_vector for this level
     
     //get the list for the current level
-    level_list = &(*m_tree->levels)[this->current_level-1];
+    level_list = m_tree->get_level_list(this->current_depth - 1);
 
     //for every member of current level list
     for (std::list<mem_node *>::iterator it = level_list->begin();
          it != level_list->end(); ++it) {
 
         //assign address of this node
-        temp_parent_range.end_addr = (*it)->node_addr;
+        temp_parent_range.end_addr = (*it)->get_addr();
 
-        //calculate allowed lookback (shouldn't cross segment boundaries)
-        ret = get_region_by_addr((void *) (*it)->node_addr, &matched_m_entry,
-                                 &matched_m_offset, &p_mem->m_data);
-        //throw exception if there is no match (should be never, memory corruption?)
-        if (ret != 0) {
+        vma_node = (cm_list_node *) (*it)->get_vma_node();
+        vma = LN_GET_NODE_AREA(vma_node);
+
+        off = (unsigned int)ln_get_area_offset(vma_node, temp_parent_range.end_addr);
+        if (off == -1) {
             throw std::runtime_error(exception_str[0]);
         }
 
         //calculate permitted lookback
         min = 0;
-        max = (unsigned int) args->ptr_lookback;
-        allowed_lookback = std::clamp(matched_m_offset, min, max);
+        max = (unsigned int) args->max_struct_size;
+        allowed_struct_size = std::clamp(off, min, max);
 
         //assign start addr based on allowed lookback
-        temp_parent_range.start_addr = temp_parent_range.end_addr - allowed_lookback;
+        temp_parent_range.start_addr = temp_parent_range.end_addr
+                                       - allowed_struct_size;
         
         //assign node pointer
         temp_parent_range.parent_node = (*it);
 
-        //add temp_parent_range to vector of parent vectors
-        this->parent_range_vector.push_back(temp_parent_range);
-    }
+        //add temp_parent_range to this level's list of parent ranges
+        this->parent_ranges.push_back(temp_parent_range);
+    
+    } //end for
+
+    return;
 }
 
 
@@ -317,7 +314,7 @@ void thread_ctrl::start_level() {
     int ret;
 
     //wait on barrier for threads to become ready
-    ret = pthread_barrier_wait(&this->level_barrier);
+    ret = pthread_barrier_wait(&this->depth_barrier);
     if (ret != 0 && ret != PTHREAD_BARRIER_SERIAL_THREAD) {
         throw std::runtime_error(exception_str[0]);
     }
@@ -334,7 +331,7 @@ void thread_ctrl::end_level() {
     int ret;
 
     //wait on barrier for threads to finish current level
-    ret = pthread_barrier_wait(&this->level_barrier);
+    ret = pthread_barrier_wait(&this->depth_barrier);
     if (ret != 0 && ret != PTHREAD_BARRIER_SERIAL_THREAD) {
         throw std::runtime_error(exception_str[0]);
     }
@@ -342,24 +339,26 @@ void thread_ctrl::end_level() {
 
 
 //wait for all threads to terminate
-void thread_ctrl::wait_thread_terminate() {
+thread_ctrl::~thread_ctrl() {
 
     const char * exception_str[2] {
-        "thread_ctrl -> wait_thread_terminate: pthread_join() failed to join threads.",
-        "thread_ctrl -> wait_thread_terminate: pthread_join() thread returned bad_ret."
+        "thread_ctrl -> wait_thread_terminate: pthread_join() failed to join.",
+        "thread_ctrl -> wait_thread_terminate: pthread_join() thread returned error."
     };
 
     int ret;
     int * thread_ret;
 
     //for every thread
-    for (unsigned int i = 0; i < (unsigned int) this->thread_vector.size(); ++i) {
-        ret = pthread_join(this->thread_vector[i].id, (void **) &thread_ret);
+    for (int i = 0; i < this->threads.size(); ++i) {
+        ret = pthread_join(*this->threads[i].get_id(), (void **) &thread_ret);
         if (ret != 0) {
             throw std::runtime_error(exception_str[0]);
         }
         if (*thread_ret == -1) {
             throw std::runtime_error(exception_str[1]);
         }
-    } //end for 
+    } //end for
+
+    return;
 }

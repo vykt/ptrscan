@@ -41,6 +41,11 @@ typedef struct {
 } region;
 
 
+/*
+ *  This struct effectively stores the runtime configuration. It is first populated
+ *  by argument parsing code in args.cpp, and then by the initialisation in mem.cpp.
+ */
+
 //arguments passed via flags
 typedef struct {
 
@@ -73,6 +78,6 @@ typedef struct {
 
 } args_struct;
 
-int process_args(int argc, char ** argv, args_struct * args);
+int process_args(const int argc, const char ** argv, args_struct * args);
 
 #endif

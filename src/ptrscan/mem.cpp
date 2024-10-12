@@ -17,7 +17,7 @@
 
 // --- PRIVATE METHODS
 
-inline void mem::interpret_target(args_struct * args) {
+inline const pid_t mem::interpret_target(args_struct * args) {
 
     const char * exception_str[4] = {
         "mem -> interpret_target: failed to retrieve process name for given PID.",
@@ -27,6 +27,7 @@ inline void mem::interpret_target(args_struct * args) {
     };
 
     int ret;
+    pid_t pid;
     char proc_name[NAME_MAX];
     cm_vector pid_vector;
 
@@ -36,7 +37,7 @@ inline void mem::interpret_target(args_struct * args) {
 	if(args->target_str.find_first_not_of("0123456789") == std::string::npos) {
         
         //set pid
-        this->pid = (pid_t) std::stoi(args->target_str);
+        pid = (pid_t) std::stoi(args->target_str);
         
         //get process name
         ret = ln_name_by_pid(this->pid, proc_name);
@@ -51,8 +52,8 @@ inline void mem::interpret_target(args_struct * args) {
     } else {
 
         //get PIDs for this comm
-        ret = ln_pid_by_name((const char *) args->target_str.c_str(), &pid_vector);
-        if (ret == -1) {
+        pid = ln_pid_by_name((const char *) args->target_str.c_str(), &pid_vector);
+        if (pid == -1) {
             throw std::runtime_error(exception_str[1]);
         }
         if (pid_vector.len == 0) {
@@ -70,11 +71,11 @@ inline void mem::interpret_target(args_struct * args) {
 
     }
 
-    return;
+    return pid;
 }
 
 
-inline void mem::open_session(args_struct * args) {
+inline void mem::open_session(const args_struct * args) {
 
     const char * exception_str[1] = {
         "mem -> open_session: failed to open a liblain session."
@@ -91,10 +92,27 @@ inline void mem::open_session(args_struct * args) {
 }
 
 
-inline void mem::get_map() {
+inline void mem::close_session() {
 
     const char * exception_str[1] = {
-        "mem -> read_map: failed to get a map of the target."
+        "mem -> close_session: failed to close a liblain session."
+    };
+
+    int ret;
+
+    ret = ln_close(&this->session);
+    if (ret) {
+        throw std::runtime_error(exception_str[0]);
+    }
+
+    return;
+}
+
+
+inline void mem::acquire_map() {
+
+    const char * exception_str[1] = {
+        "mem -> acquire_map: failed to get a map of the target."
     };
 
     int ret;
@@ -102,6 +120,23 @@ inline void mem::get_map() {
     ln_new_vm_map(&this->map);
 
     ret = ln_update_map(&this->session, &this->map);
+    if (ret) {
+        throw std::runtime_error(exception_str[0]);
+    }
+
+    return;
+}
+
+
+inline void mem::release_map() {
+
+    const char * exception_str[1] = {
+        "mem -> release_map: failed to free a map of the target."
+    };
+
+    int ret;
+
+    ret = ln_del_vm_map(&this->map);
     if (ret) {
         throw std::runtime_error(exception_str[0]);
     }
@@ -239,18 +274,19 @@ void mem::populate_regions(args_struct * args) {
 // --- PUBLIC METHODS
 
 //constructor
-void mem::init_mem(args_struct * args, ui_base * ui) {
+mem::mem(args_struct * args, ui_base * ui) :
 
-    int ret;
+    //initialiser list
+    pid(interpret_target(args))
+    //end initialiser list
 
-    //get PID for target process
-	interpret_target(args);
+    {
 
     //open a procfs or lainko session
     open_session(args);
 
     //read process maps
-    get_map();
+    acquire_map();
 
     //get a vector of every rw- memory region
     populate_regions(args);
@@ -258,12 +294,34 @@ void mem::init_mem(args_struct * args, ui_base * ui) {
     return;
 }
 
+//destructor
+mem::~mem() {
 
-inline std::vector<cm_list_node *> * mem::get_rw_regions() {
+    //close a procfs or lainko session
+    close_session();
+
+    //free process maps
+    release_map();
+
+    return;
+}
+
+
+inline const int mem::get_pid() const {
+    return this->pid;
+}
+
+
+inline const ln_vm_map * mem::get_map() const {
+    return &this->map;
+}
+
+
+inline const std::vector<cm_list_node *> * mem::get_rw_regions() const {
     return &this->rw_regions;
 }
 
 
-inline std::vector<cm_list_node *> * mem::get_static_regions() {
+inline const std::vector<cm_list_node *> * mem::get_static_regions() const {
     return &this->static_regions;
 }

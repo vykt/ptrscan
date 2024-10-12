@@ -17,6 +17,17 @@
 #define READ_BUF_SIZE 0x1000 //maybe set to sizeof(memory page) later
 
 
+//stores relationship between read buffer and current region
+typedef struct {
+ 
+    ssize_t left;  //bytes left to read in region
+    ssize_t done;  //bytes already read in region
+    ssize_t last;  //bytes read with last read call
+    ssize_t total; //total bytes in region
+
+} read_state;
+
+
 //one of the regions a thread is set to scan
 typedef struct {
 
@@ -42,7 +53,8 @@ class thread {
 
     private:
         //attributes
-        int ui_id;
+        /*const*/ int ui_id;
+        
         pthread_t id;
         pthread_barrier_t * depth_barrier; //ptr to thread_ctrl's member
         
@@ -56,26 +68,31 @@ class thread {
     
     private:
         //methods
-        int addr_parent_compare(uintptr_t addr, args_struct * args);
+        ssize_t get_next_buffer_smart(const args_struct * args, read_state * r_state, 
+                                      cm_byte * read_buf, const uintptr_t read_addr, 
+                                      const bool region_first_read);
+        int addr_parent_compare(const args_struct * args, const uintptr_t addr);
+
 
     public:
         //methods
-        ssize_t get_next_buffer_smart(cm_byte * mem_buf, ssize_t read_left, 
-                                      ssize_t read_last, bool first_region_read);
-        void thread_main(args_struct * args, mem * m, mem_tree * m_tree, ui_base * ui);
+        void thread_main(const args_struct * args, const mem * m, 
+                         mem_tree * m_tree, ui_base * ui);
         void reset_current_addr();
         
-        void link_thread(int ui_id, unsigned int * current_depth,
+        void link_thread(const int ui_id, unsigned int * current_depth,
                          pthread_barrier_t * depth_barrier, 
                          std::vector<parent_range> * parent_ranges);
-        void setup_session(int ln_iface, int pid);
+        void setup_session(const int ln_iface, const pid_t pid);
+        void release_session();
 
+        //getters & setters
         pthread_t * get_id();
 
-        int get_ui_id();
+        const int get_ui_id() const;
         void set_ui_id(int ui_id);
 
-        std::vector<vma_scan_range> * get_vma_scan_ranges();
+        void add_vma_scan_range(vma_scan_range range);
 };
 
 
@@ -91,7 +108,7 @@ typedef struct {
 } thread_arg;
 
 //function called by pthread_create_t
-void * thread_bootstrap(void * arg_bootstrap);
+void * thread_bootstrap(void * arg);
 
 
 #endif

@@ -33,24 +33,40 @@ class mem_node {
 
     private:
         //attributes
-        unsigned int id;
+        const int id;
 
-        int rw_regions_index;     //-1 if not in a rw region
-        int static_regions_index; //-1 if not in a static region
+        const int rw_regions_index;     //-1 if not in a rw region
+        const int static_regions_index; //-1 if not in a static region
 
-        uintptr_t addr;           //where this pointer is stored
-        uintptr_t ptr_addr;       //where this pointer points to
-        
-        mem_node * parent;
+        const uintptr_t addr;           //where this pointer is stored
+        const uintptr_t ptr_addr;       //where this pointer points to
+
+        const cm_list_node * vma_node;
+
+        const mem_node * parent;
         std::list<mem_node> children;
+
+    private:
+        //methods
+        const int check_index(const mem * m, const int mode);
 
     public:
         //methods
-        mem_node(uintptr_t addr, uintptr_t ptr_addr, mem_node * parent, mem * m);
+        mem_node(const uintptr_t addr, const uintptr_t ptr_addr, 
+                 const cm_list_node * vma_node, const mem_node * parent, 
+                 const mem * m);
 
-        void add_child(mem_node * child);
+        const mem_node * add_child(const mem_node * child);
 
-        mem_node * get_parent();
+        //getters & setters
+        const int get_rw_regions_index() const;
+        const int get_static_regions_index() const;
+        
+        const uintptr_t get_addr() const;
+        const uintptr_t get_ptr_addr() const;
+        const cm_list_node * get_vma_node() const;
+
+        const mem_node * get_parent() const;
         std::list<mem_node> * get_children();
 };
 
@@ -61,16 +77,22 @@ class mem_tree {
     private:
         //attributes
         pthread_mutex_t write_mutex;
+
         std::vector<std::list<mem_node *>> * levels; //all levels of the tree
         const mem_node * root_node;
 
     public:
         //methods
-        mem_tree(args_struct * args, mem * m);
+        mem_tree(const args_struct * args, mem * m);
         ~mem_tree();
 
-        void add_node(uintptr_t addr, uintptr_t ptr_addr, 
-                      mem_node * parent, unsigned int level, mem * m);
+        void add_node(const uintptr_t addr, const uintptr_t ptr_addr, 
+                      const cm_list_node * vma_node, mem_node * parent, 
+                      const int level, const mem * m);
+
+        //getters & setters
+        std::list<mem_node *> * get_level_list(int level) const;
+        const mem_node * get_root_node() const;
 };
 
 

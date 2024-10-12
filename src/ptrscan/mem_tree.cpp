@@ -5,22 +5,22 @@
 #include <pthread.h>
 
 #include "mem_tree.h"
-#include "proc_mem.h"
+#include "mem.h"
 #include "args.h"
 
 
-static unsigned int _next_node_id = 0;
+static int _next_node_id = 0;
 
 
-// --- INTERNAL
+// --- PRIVATE mem_node METHODS
 
 //check if address is in read & write regions, or if it is in a static region (mode)
-static int _check_index(uintptr_t addr, mem * m, int mode) {
+const int mem_node::check_index(const mem * m, const int mode) {
 
     bool eval;
 
     ln_vm_area * vma;
-    std::vector<cm_list_node *> * mode_vector;
+    const std::vector<cm_list_node *> * mode_vector;
 
 
     //get appropriate mode vector
@@ -36,7 +36,7 @@ static int _check_index(uintptr_t addr, mem * m, int mode) {
         vma = LN_GET_NODE_AREA((*mode_vector)[i]);
 
         //check if node_addr falls in range of this static region
-        if ((vma->start_addr <= addr) && (vma->end_addr > addr)) return i;
+        if ((vma->start_addr <= this->addr) && (vma->end_addr > this->addr)) return i;
 
     } //end for
 
@@ -47,29 +47,60 @@ static int _check_index(uintptr_t addr, mem * m, int mode) {
 // --- PUBLIC mem_node METHODS
 
 //constructor for each node
-mem_node::mem_node(uintptr_t addr, uintptr_t ptr_addr, 
-                   mem_node * parent, mem * m) {
+mem_node::mem_node(const uintptr_t addr, const uintptr_t ptr_addr, 
+                   const cm_list_node * vma_node, const mem_node * parent, 
+                   const mem * m) :
+    
+    //initialiser list
+    id(_next_node_id),
+    rw_regions_index(check_index(m, CHECK_RW)),
+    static_regions_index(check_index(m, CHECK_STATIC)),
+    addr(addr),
+    ptr_addr(ptr_addr),
+    vma_node(vma_node),
+    parent(parent) 
+    //end initialiser list
+    
+    {
 
-    this->id = _next_node_id;
     _next_node_id++;
 
-    this->addr                 = addr;
-    this->ptr_addr             = ptr_addr;
-    this->rw_regions_index     = _check_index(addr, m, CHECK_RW);
-    this->static_regions_index = _check_index(addr, m, CHECK_STATIC);
-    this->parent               = parent;
-
     return;
 }
 
 
-inline void mem_node::add_child(mem_node * child) {
+inline const mem_node * mem_node::add_child(const mem_node * child) {
     this->children.push_front(*child);
-    return;
+    return &this->children.front();
 }
 
 
-inline mem_node * mem_node::get_parent() {
+inline const int mem_node::get_rw_regions_index() const {
+    return this->rw_regions_index;
+}
+
+
+inline const int mem_node::get_static_regions_index() const {
+    return this->static_regions_index;
+}
+
+
+inline const uintptr_t mem_node::get_addr() const {
+    return this->addr;
+}
+
+
+inline const uintptr_t mem_node::get_ptr_addr() const {
+    return this->ptr_addr;
+}
+
+
+inline const cm_list_node * mem_node::get_vma_node() const {
+    return this->vma_node;
+}
+
+
+inline const mem_node * mem_node::get_parent() const {
     return this->parent;
 }
 
@@ -83,16 +114,25 @@ inline std::list<mem_node> * mem_node::get_children() {
 // --- PUBLIC mem_tree METHODS
 
 //constructor, sets up root node of tree based on args
-mem_tree::mem_tree(args_struct * args, mem * m) {
+mem_tree::mem_tree(const args_struct * args, mem * m) {
 
-    const char * exception_str[1] = {
+    const char * exception_str[2] = {
+        "mem_tree -> constructor: target address does not belong to a vma."
         "mem_tree -> constructor: failed to initialise write mutex."
     };
 
     int ret;
+    cm_list_node * vma_node;
+
+
+    //locate vma of root node
+    vma_node = ln_get_vm_area_by_addr(m->get_map(), args->target_addr, nullptr);
+    if (vma_node == NULL) {
+        throw std::runtime_error(exception_str[0]);
+    }
 
     //create root node
-    this->root_node = new mem_node(args->target_addr, 0, nullptr, m);
+    this->root_node = new mem_node(args->target_addr, 0, vma_node, nullptr, m);
 
     //create tree levels vector to store a lists of nodes at each depth level
     this->levels = new std::vector<std::list<mem_node *>>(args->max_depth);
@@ -103,7 +143,7 @@ mem_tree::mem_tree(args_struct * args, mem * m) {
     //initialise the mutex
     ret = pthread_mutex_init(&this->write_mutex, nullptr);
     if (ret) {
-        throw std::runtime_error(exception_str[0]);
+        throw std::runtime_error(exception_str[1]);
     }
 
     return;
@@ -120,8 +160,9 @@ mem_tree::~mem_tree() {
 
 
 //add node to tree
-void mem_tree::add_node(uintptr_t addr, uintptr_t ptr_addr, 
-                        mem_node * parent, unsigned int level, mem * m) {
+void mem_tree::add_node(const uintptr_t addr, const uintptr_t ptr_addr, 
+                        const cm_list_node * vma_node, mem_node * parent, 
+                        const int level, const mem * m) {
 
     const char * exception_str[2] = {
         "mem_tree -> add_node: failed to acquire write lock.",
@@ -130,13 +171,12 @@ void mem_tree::add_node(uintptr_t addr, uintptr_t ptr_addr,
 
     int ret;
 
-    std::list<mem_node> * parent_children_list;
     std::list<mem_node *> * current_level_list;
-    mem_node * pushed_m_node;
+    const mem_node * pushed_m_node;
 
 
     //define new node
-    mem_node m_node(addr, ptr_addr, parent, m);
+    mem_node m_node(addr, ptr_addr, vma_node, parent, m);
 
     //acquire mutex to modify tree
     ret = pthread_mutex_lock(&this->write_mutex);
@@ -145,21 +185,29 @@ void mem_tree::add_node(uintptr_t addr, uintptr_t ptr_addr,
     }
 
     //add new node to its parent subnode_vector
-    parent->add_child(&m_node);
-
-    //get parent's children list
-    parent_children_list = parent->get_children();
+    pushed_m_node = parent->add_child(&m_node);
 
     //get meta list for current level
     current_level_list = &(*this->levels)[level];
 
     //put the just-inserted mem_node into the levels meta list
-    pushed_m_node = &parent_children_list->front();
-    current_level_list->push_front(pushed_m_node);
+    current_level_list->push_front((mem_node *) pushed_m_node);
 
     //free mutex
     ret = pthread_mutex_unlock(&this->write_mutex);
     if (ret) {
         throw std::runtime_error(exception_str[1]);
     }
+
+    return;
+}
+
+
+inline std::list<mem_node *> * mem_tree::get_level_list(int level) const {
+    return &(*this->levels)[level];
+}
+
+
+inline const mem_node * mem_tree::get_root_node() const {
+    return this->root_node;
 }

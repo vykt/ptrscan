@@ -7,15 +7,18 @@
 
 #include <linux/limits.h>
 
-#include <libpwu.h>
+#include <libcmore.h>
+#include <liblain.h>
 
 #include "serialise.h"
 #include "args.h"
 #include "mem_tree.h"
 
 
+// --- INTERNAL
+
 //handle fgetc() errors
-inline bool handle_fgetc_err(int ret, FILE * fs, bool get_EOF) {
+static inline bool _handle_fgetc_err(int ret, FILE * fs, bool get_EOF) {
 
     const char * exception_str[2] = {
         "serialise -> read_disk_ptrchains: error reading file.",
@@ -43,7 +46,7 @@ inline bool handle_fgetc_err(int ret, FILE * fs, bool get_EOF) {
 
 
 //get uint32_t from file stream
-inline uint32_t get_stream_uint32_t(FILE * fs) {
+static inline uint32_t _get_stream_uint32_t(FILE * fs) {
 
     uint32_t ret;
     byte * ret_ptr;
@@ -62,9 +65,8 @@ inline uint32_t get_stream_uint32_t(FILE * fs) {
 }
 
 
-
 //wrapper for fwrite() to get rid of failure testing
-inline void record_value(void * value, size_t size, size_t nmemb, FILE * fs) {
+static inline void _record_value(void * value, size_t size, size_t nmemb, FILE * fs) {
 
     const char * exception_str[1] = {
         "serialise -> record_value: fwrite() wrote less/more than requested."
@@ -79,97 +81,81 @@ inline void record_value(void * value, size_t size, size_t nmemb, FILE * fs) {
 }
 
 
+// --- PRIVATE METHODS
+
 //add offset from previous node to current node, producing an offset chain
 void serialise::recurse_get_next_offset(mem_node * m_node, serial_entry * s_entry,
                                         uintptr_t last_point) {
 
     //add offset for this node
-    s_entry->offset_vector->push_back((uint32_t) m_node->node_addr - last_point);
+    uint32_t offset;
+
+    offset = (uint32_t) (m_node->get_addr() - last_point);
+
+    s_entry->offset_vector->push_back(offset);
 
     //recurse if this is not the root node
-    if (m_node->parent_node != nullptr) {
-        this->recurse_get_next_offset(m_node->parent_node, s_entry,
-                                      m_node->point_addr);
+    if (m_node->get_parent() != nullptr) {
+        this->recurse_get_next_offset(m_node->get_parent(), s_entry,
+                                      m_node->get_ptr_addr());
     }
 
     return;
 }
 
 
-/*
- *  this function does not check children of static nodes (desirable behaviour)
- */
-
 //recurse down the tree from root looking for leaves or static nodes
-void serialise::recurse_node(args_struct * args, mem_node * m_node, proc_mem * p_mem, 
-                             unsigned int current_level) {
-
-    const char * exception_str[1] = {
-        "serialise -> recurse_node: vector_get_ref() failed when getting first offset"
-    };
-
+void serialise::recurse_node(args_struct * args, mem * m, 
+                             mem_node * m_node, unsigned int current_depth) {
 
     int ret;
-    uint32_t first_offset;
+    
+    uint32_t offset;
+
     serial_entry temp_s_entry;
+    std::list<mem_node> * children;
 
-    unsigned long m_obj_index;
-
-    maps_obj * m_obj;
-    maps_entry * m_obj_first_m_entry;
+    ln_vm_area * vma;
 
 
     //if this node is not in a read & write region it is a false positive
-    if (m_node->rw_regions_index == -1) return;
+    if (m_node->get_rw_regions_index() == -1) return;
 
-    //check if node is static or is at the final level
-    if (m_node->static_regions_index != -1 || current_level >= args->levels - 1) {
+    //check if node is static or recursion reached max depth
+    if ((m_node->get_static_regions_index() != -1) 
+        || (current_depth >= args->max_depth - 1)) {
         
         //setup new serial entry
         memset(&temp_s_entry, 0, sizeof(temp_s_entry));
-        temp_s_entry.rw_regions_index = m_node->rw_regions_index;
-        temp_s_entry.static_regions_index = m_node->static_regions_index;
+        temp_s_entry.rw_regions_index = m_node->get_rw_regions_index();
+        temp_s_entry.static_regions_index = m_node->get_static_regions_index();
         temp_s_entry.offset_vector = new std::vector<uint32_t>;
-
+        
         //calculate first offset from the start of maps_obj to node's address
-        
-        //1. get maps_obj index
-        m_obj_index = 
-            p_mem->rw_regions_vector[temp_s_entry.rw_regions_index]->obj_vector_index;
-        
-        //2. get maps_obj pointer
-        ret = vector_get_ref(&p_mem->m_data.obj_vector, m_obj_index, 
-                             (byte **) &m_obj);
-        if (ret == -1) throw std::runtime_error(exception_str[0]);
-
-        //3. get the first entry of the maps_obj
-        ret = vector_get(&m_obj->entry_vector, 0, (byte *) &m_obj_first_m_entry);
-        if (ret == -1) throw std::runtime_error(exception_str[0]);
-
-        //4. calculate the offset
-        first_offset = (uint32_t) (m_node->node_addr 
-                                   - (uintptr_t) m_obj_first_m_entry->start_addr);
+        vma = LN_GET_NODE_AREA(m_node->get_vma_node());
+        offset = (uint32_t) ln_get_obj_offset(vma->obj_node_ptr, m_node->get_addr());
 
         //add the offset
-        temp_s_entry.offset_vector->push_back(first_offset);
+        temp_s_entry.offset_vector->push_back(offset);
 
         //recursively traverse to root, adding offsets in the process
-        this->recurse_get_next_offset(m_node->parent_node, &temp_s_entry,
-                                      m_node->point_addr);
+        this->recurse_get_next_offset(m_node->get_parent(), &temp_s_entry,
+                                      m_node->get_ptr_addr());
 
         //add this serial entry to the ptrchains vector
         this->ptrchains_vector.push_back(temp_s_entry);
 
-
     //else recurse for all child nodes
     } else {
 
+        children = m_node->get_children();
+
         //for each child node
-        for (std::list<mem_node>::iterator it = m_node->subnode_list.begin();
-             it != m_node->subnode_list.end(); ++it) {
+        for (std::list<mem_node>::iterator it = children->begin();
+             it != children->end(); ++it) {
 
             //recurse down
-            this->recurse_node(args, &(*it), p_mem, current_level + 1);
+            this->recurse_node(args, m, &(*it), current_depth + 1);
             
         } //end for
     } //end if-else
@@ -178,49 +164,10 @@ void serialise::recurse_node(args_struct * args, mem_node * m_node, proc_mem * p
 }
 
 
-/*
- *  NOTE! call either tree_to_results() OR read_disk_results() to build results vector
- */
+// --- PUBLIC METHODS
 
 //convert mem_tree to a serialised format that can be stored and printed.
-void serialise::tree_to_results(args_struct * args, proc_mem * p_mem, 
-                                mem_tree * m_tree) {
-
-    char * name_substring;
-
-    /*
-     *  This process could be more efficient, its a refactor after a substantial fuckup
-     */
-
-    //for each rw region, extract strings
-    for (unsigned int i = 0;
-         i < (unsigned int) p_mem->rw_regions_vector.size(); ++i) {
-
-        //extract name from absolute path
-        name_substring = strrchr(p_mem->rw_regions_vector[i]->pathname, '/') + 1;
-        if (name_substring == (char *) 1)
-            name_substring = p_mem->rw_regions_vector[i]->pathname;
-
-        //add name to local static_region_str_vector
-        this->rw_region_str_vector.push_back(std::string(name_substring));
-
-    } //end for
-
-
-    //for each static region, extract strings
-    for (unsigned int i = 0;
-         i < (unsigned int) p_mem->static_regions_vector.size(); ++i) {
-
-        //extract name from absolute path
-        name_substring = strrchr(p_mem->static_regions_vector[i]->pathname, '/') + 1;
-        if (name_substring == (char *) 1)
-            name_substring = p_mem->static_regions_vector[i]->pathname;
-
-        //add name to local static_region_str_vector
-        this->static_region_str_vector.push_back(std::string(name_substring));
-
-    } //end for
-
+void serialise::tree_to_results(args_struct * args, mem * m, mem_tree * m_tree) {
 
     //start recursive depth first traversal from root
     this->recurse_node(args, (mem_node *) m_tree->root_node, p_mem, 0);

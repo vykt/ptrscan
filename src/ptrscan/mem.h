@@ -28,7 +28,7 @@ class mem {
 
     private:
         //attributes
-        pid_t pid;
+        const pid_t pid;
         
         ln_session session;
         ln_vm_map map;
@@ -36,21 +36,28 @@ class mem {
         std::vector<cm_list_node *> rw_regions;     //holds: ln_vm_area
         std::vector<cm_list_node *> static_regions; //holds: ln_vm_area
 
-    public:
-        //methods
-        void init_mem(args_struct * args, ui_base * ui);
-        
-        std::vector<cm_list_node *> * get_rw_regions();
-        std::vector<cm_list_node *> * get_static_regions();
 
     private:
         //methods
-        void interpret_target(args_struct * args);
-        void open_session(args_struct * args);
-        void get_map();
+        const pid_t interpret_target(args_struct * args);
+        void open_session(const args_struct * args);
+        void close_session();
+        void acquire_map();
+        void release_map();
         void add_standard_vmas(args_struct * args);
         void add_static_vma(args_struct * args, cm_list_node * vma_node);
         void populate_regions(args_struct * args);
+
+    public:
+        //methods
+        mem(args_struct * args, ui_base * ui);
+        ~mem();
+
+        //getters & setters
+        const int get_pid() const;
+        const ln_vm_map * get_map() const;
+        const std::vector<cm_list_node *> * get_rw_regions() const;
+        const std::vector<cm_list_node *> * get_static_regions() const;
 };
 
 #endif
