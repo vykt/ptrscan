@@ -152,17 +152,17 @@ inline void mem::add_standard_vmas(args_struct * args) {
     const region bss_region = { args->target_comm, 0, 0 };
 
     //add standard vmas to always scan
-    args->exclusive_rw_regions.insert(args->exclusive_rw_regions.begin(), 
+    args->exclusive_rw_areas.insert(args->exclusive_rw_areas.begin(), 
                                       stack_region);
-    args->exclusive_rw_regions.insert(args->exclusive_rw_regions.begin(), 
+    args->exclusive_rw_areas.insert(args->exclusive_rw_areas.begin(), 
                                       heap_region);
-    args->exclusive_rw_regions.insert(args->exclusive_rw_regions.begin(), 
+    args->exclusive_rw_areas.insert(args->exclusive_rw_areas.begin(), 
                                       bss_region);
 
     //add standard vmas to always treat as static
-    args->extra_static_regions.insert(args->extra_static_regions.begin(), 
+    args->extra_static_areas.insert(args->extra_static_areas.begin(), 
                                       stack_region);
-    args->extra_static_regions.insert(args->extra_static_regions.begin(), 
+    args->extra_static_areas.insert(args->extra_static_areas.begin(), 
                                       bss_region);
 
     return;
@@ -178,9 +178,9 @@ inline void mem::add_static_vma(args_struct * args, cm_list_node * vma_node) {
 
 
     //for every static region
-    for (unsigned int i = 0; i < args->extra_static_regions.size(); ++i) {
+    for (unsigned int i = 0; i < args->extra_static_areas.size(); ++i) {
 
-        iter_region = &(args->extra_static_regions)[i];
+        iter_region = &(args->extra_static_areas)[i];
 
         //continue if basename is not a match | vma->basename can't be null
         ret = strncmp(vma->basename, iter_region->pathname.c_str(), NAME_MAX);
@@ -191,7 +191,7 @@ inline void mem::add_static_vma(args_struct * args, cm_list_node * vma_node) {
         if (iter_region->skipped <= iter_region->skip) continue;
 
         //all checks paseed, add to static vector
-        this->static_regions.insert(this->static_regions.end(), vma_node);
+        this->static_areas.insert(this->static_areas.end(), vma_node);
         
         //impossible to match more than once, safe to break
         break;
@@ -202,10 +202,44 @@ inline void mem::add_static_vma(args_struct * args, cm_list_node * vma_node) {
 }
 
 
-void mem::populate_regions(args_struct * args) {
+// --- PUBLIC METHODS
+
+//constructor
+mem::mem(args_struct * args, ui_base * ui) :
+
+    //initialiser list
+    pid(interpret_target(args))
+    //end initialiser list
+
+    {
+
+    //open a procfs or lainko session
+    open_session(args);
+
+    //read process maps
+    acquire_map();
+
+    return;
+}
+
+//destructor
+mem::~mem() {
+
+    //close a procfs or lainko session
+    close_session();
+
+    //free process maps
+    release_map();
+
+    return;
+}
+
+
+//populate rw- & static maps
+void mem::populate_areas(args_struct * args) {
 
     const char * exception_str[1] = {
-        "mem -> populate_regions: map's vma list is empty."
+        "mem -> populate_areas: map's vma list is empty."
     };
 
     //TODO find & add others
@@ -249,10 +283,10 @@ void mem::populate_regions(args_struct * args) {
         if (vma->access & (LN_ACCESS_READ | LN_ACCESS_WRITE)) continue;
 
         //if user specified an exclusive set of vmas to scan
-        if (!(args->exclusive_rw_regions.empty())) {
+        if (!(args->exclusive_rw_areas.empty())) {
 
             //check if this vma is in the exclusive set
-            for (int i = 0; i < args->exclusive_rw_regions.size(); ++i) {
+            for (int i = 0; i < args->exclusive_rw_areas.size(); ++i) {
                 exclusive_rw_found = true;
             }
             if (!exclusive_rw_found) continue;
@@ -260,48 +294,12 @@ void mem::populate_regions(args_struct * args) {
         } //end if exclusive set applies
 
         //all checks passed, add to rw-/rwx vector
-        this->rw_regions.insert(this->rw_regions.end(), vma_node);
+        this->rw_areas.insert(this->rw_areas.end(), vma_node);
 
         //check if this region should also be added as static
         add_static_vma(args, vma_node);
     
     } //end for
-
-    return;
-}
-
-
-// --- PUBLIC METHODS
-
-//constructor
-mem::mem(args_struct * args, ui_base * ui) :
-
-    //initialiser list
-    pid(interpret_target(args))
-    //end initialiser list
-
-    {
-
-    //open a procfs or lainko session
-    open_session(args);
-
-    //read process maps
-    acquire_map();
-
-    //get a vector of every rw- memory region
-    populate_regions(args);
-
-    return;
-}
-
-//destructor
-mem::~mem() {
-
-    //close a procfs or lainko session
-    close_session();
-
-    //free process maps
-    release_map();
 
     return;
 }
@@ -317,11 +315,11 @@ inline const ln_vm_map * mem::get_map() const {
 }
 
 
-inline const std::vector<cm_list_node *> * mem::get_rw_regions() const {
-    return &this->rw_regions;
+inline const std::vector<cm_list_node *> * mem::get_rw_areas() const {
+    return &this->rw_areas;
 }
 
 
-inline const std::vector<cm_list_node *> * mem::get_static_regions() const {
-    return &this->static_regions;
+inline const std::vector<cm_list_node *> * mem::get_static_areas() const {
+    return &this->static_areas;
 }

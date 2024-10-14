@@ -35,8 +35,8 @@ class mem_node {
         //attributes
         const int id;
 
-        const int rw_regions_index;     //-1 if not in a rw region
-        const int static_regions_index; //-1 if not in a static region
+        const int rw_areas_index;     //-1 if not in a rw region
+        const int static_areas_index; //-1 if not in a static region
 
         const uintptr_t addr;           //where this pointer is stored
         const uintptr_t ptr_addr;       //where this pointer points to
@@ -59,15 +59,15 @@ class mem_node {
         const mem_node * add_child(const mem_node * child);
 
         //getters & setters
-        const int get_rw_regions_index() const;
-        const int get_static_regions_index() const;
+        const int get_rw_areas_index() const;
+        const int get_static_areas_index() const;
         
         const uintptr_t get_addr() const;
         const uintptr_t get_ptr_addr() const;
         const cm_list_node * get_vma_node() const;
 
         const mem_node * get_parent() const;
-        std::list<mem_node> * get_children();
+        const std::list<mem_node> * get_children() const;
 };
 
 

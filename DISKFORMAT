@@ -9,7 +9,7 @@ This file defines the binary format used by ptrscan to store pointer chains.
 
  --- OVERVIEW:
 
-    <metadata><static_region_definitions><rw region definitions><offsets>
+    <metadata><rw_object_definitions><static_object_definitions><offsets>
 
 
  --- METADATA:
@@ -19,17 +19,6 @@ This file defines the binary format used by ptrscan to store pointer chains.
 
      where:
         <bitwidth>   : uint16_t     : bit width of the pointers in the scan.
-
-
- --- STATIC_REGION_DEFINITIONS:
-
-    format:
-        <name_0><DELIM_REGION>[...]<name_N><DELIM_REGION><DELIM_REGION>
-
-    where:
-      <name_x>       : ASCII string : basename of the backing object for this vma.
-
-      <DELIM_REGION> : byte         : the value 0x00, used as a delimiter.
 
 
  --- RW_REGION_DEFINITIONS:
@@ -42,11 +31,23 @@ This file defines the binary format used by ptrscan to store pointer chains.
 
       <DELIM_REGION> : byte         | the value 0x00, used as a delimiter
 
+ 
+ --- STATIC_REGION_DEFINITIONS:
+
+    format:
+        <name_0><DELIM_REGION>[...]<name_N><DELIM_REGION><DELIM_REGION>
+
+    where:
+      <name_x>       : ASCII string : basename of the backing object for this vma.
+
+      <DELIM_REGION> : byte         : the value 0x00, used as a delimiter.
+
+
 
  --- OFFSETS:
     
     format:
-        <offset_set_0>[...]<offset_set_n>
+        <offset_set_0>[...]<offset_set_n><DELIM_OFFSET>
 
     where:
       <offset_set_x> is a set of offsets (see next section).
@@ -55,10 +56,10 @@ This file defines the binary format used by ptrscan to store pointer chains.
  --- OFFSET_SET:
 
     format:
-        <static_region_id><rw_region_id><offset_0>[...]<offset_n><DELIM_OFFSET>
+        <rw_object_id><static_object_id><offset_0>[...]<offset_n><DELIM_OFFSET>
 
     where:
-      <static_region_id> : int      : an index into static region definitions. 
-      <rw_region_id>     : int      : an index into rw region definitions.
-      <offset_x>         : uint32_t : a single offset in an offset chain 
-      <DELIM_OFFSET>     : uint32_t : the value 0xFFFFFFF0, used as a delimiter.
+      <rw_object_id>      : int      : an index into rw obj definitions.
+      <static_object_id>  : int      : an index into static obj definitions. 
+      <offset_x>          : uint32_t : a single offset in an offset chain 
+      <DELIM_OFFSET>      : uint32_t : the value 0xFFFFFFF0, used as a delimiter.

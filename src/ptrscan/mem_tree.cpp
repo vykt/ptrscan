@@ -25,9 +25,9 @@ const int mem_node::check_index(const mem * m, const int mode) {
 
     //get appropriate mode vector
     if (mode == CHECK_RW) {
-        mode_vector = m->get_rw_regions();
+        mode_vector = m->get_rw_areas();
     } else if (mode == CHECK_STATIC) {
-        mode_vector = m->get_static_regions();
+        mode_vector = m->get_static_areas();
     }
 
     //for every region
@@ -53,8 +53,8 @@ mem_node::mem_node(const uintptr_t addr, const uintptr_t ptr_addr,
     
     //initialiser list
     id(_next_node_id),
-    rw_regions_index(check_index(m, CHECK_RW)),
-    static_regions_index(check_index(m, CHECK_STATIC)),
+    rw_areas_index(check_index(m, CHECK_RW)),
+    static_areas_index(check_index(m, CHECK_STATIC)),
     addr(addr),
     ptr_addr(ptr_addr),
     vma_node(vma_node),
@@ -75,13 +75,13 @@ inline const mem_node * mem_node::add_child(const mem_node * child) {
 }
 
 
-inline const int mem_node::get_rw_regions_index() const {
-    return this->rw_regions_index;
+inline const int mem_node::get_rw_areas_index() const {
+    return this->rw_areas_index;
 }
 
 
-inline const int mem_node::get_static_regions_index() const {
-    return this->static_regions_index;
+inline const int mem_node::get_static_areas_index() const {
+    return this->static_areas_index;
 }
 
 
@@ -105,7 +105,7 @@ inline const mem_node * mem_node::get_parent() const {
 }
 
 
-inline std::list<mem_node> * mem_node::get_children() {
+inline const std::list<mem_node> * mem_node::get_children() const {
     return &this->children;
 }
 

@@ -25,15 +25,15 @@ const uintptr_t thread_ctrl::get_rw_mem_sum(const mem * m) {
     uintptr_t mem_sum, region_size;
 
     ln_vm_area * vma;
-    const std::vector<cm_list_node *> * rw_regions;
+    const std::vector<cm_list_node *> * rw_areas;
 
     mem_sum = 0;
-    rw_regions = m->get_rw_regions();
+    rw_areas = m->get_rw_areas();
 
     //for every rw- vma
-    for (int i = 0; i < rw_regions->size(); ++i) {
+    for (int i = 0; i < rw_areas->size(); ++i) {
         
-        vma = LN_GET_NODE_AREA((*rw_regions)[i]);
+        vma = LN_GET_NODE_AREA((*rw_areas)[i]);
         region_size = vma->end_addr - vma->start_addr;
         
         mem_sum += region_size;
@@ -56,7 +56,7 @@ void thread_ctrl::divide_mem(const args_struct * args,
 
     vma_scan_range temp_range;
 
-    const std::vector<cm_list_node *> * rw_regions;
+    const std::vector<cm_list_node *> * rw_areas;
     ln_vm_area * vma;
 
     //assign shares
@@ -67,7 +67,7 @@ void thread_ctrl::divide_mem(const args_struct * args,
     fwd_max = args->bit_width;
 
 
-    rw_regions = m->get_rw_regions();
+    rw_areas = m->get_rw_areas();
 
     //for every thread
     for (unsigned int i = 0; i < args->threads; ++i) {
@@ -83,7 +83,7 @@ void thread_ctrl::divide_mem(const args_struct * args,
         //while there is still vmas that needs to be assigned to the current thread
         while (temp_share != 0) {
 
-            vma = LN_GET_NODE_AREA((*rw_regions)[region_index]);
+            vma = LN_GET_NODE_AREA((*rw_areas)[region_index]);
 
             //zero out the mem_range temp buffer
             memset(&temp_range, 0, sizeof(temp_range));
@@ -101,7 +101,7 @@ void thread_ctrl::divide_mem(const args_struct * args,
                 }
 
                 //create new vma_scan_range entry for current thread
-                temp_range.vma_node   = (*rw_regions)[region_index];
+                temp_range.vma_node   = (*rw_areas)[region_index];
                 temp_range.start_addr = vma->start_addr + region_progress;
                 temp_range.end_addr   = temp_range.start_addr + temp_share;
 
@@ -136,7 +136,7 @@ void thread_ctrl::divide_mem(const args_struct * args,
                 temp_share -= region_left;
 
                 //create new mem_range entry for current thread
-                temp_range.vma_node = (*rw_regions)[region_index];
+                temp_range.vma_node = (*rw_areas)[region_index];
                 temp_range.start_addr = vma->start_addr + region_progress;
                 temp_range.end_addr = vma->end_addr;
 

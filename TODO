@@ -1,34 +1,27 @@
+REFACTOR TODO:
+
+args        : done
+debug       : 
+main        :
+mem_tree    : done
+mem         : done
+serialise   :
+thread      : done
+thread_ctrl : done
+ui_base     :
+ui_term     :
+verify      :
+
+
+
 TO FIX:
 
-1) When testing on large targes, the debug state dump will segfault. This does not occur if the debug output is redirected (via '2>') to a file. While unclear, this may be related to the segfault thrown when exceptions are improperly caught.
-
-    -I speculate that output to TTY is slow and the output buffer fills, resulting in 
-     a fail on one of the output functions, which (as intended or accidentally) throws 
-     an exception, which is improperly caught.
-
-    -Analyse core dump in future.
-
-
-
-TO ADD (URGENT):
-
-    -change args.extra_region_vector -> args.extra_static_vector v
-    -define regions to scan v
-    -define offsets (reverse order(?)) v
-    -blacklist segments v
-
+1) use hashmaps(?) to correctly handle backing objects with duplicate names
 
 
 TO ADD:
 
-!!!) way to export only static chains
 
-1) ncurses interface
 2) export .pscan files to either .json or .csv for easy integration with scripting 
    languages
 
-
-TO FIX (LONG TERM):
-
-1) add const where appropriate
-2) if scale increases, encapsulate everything

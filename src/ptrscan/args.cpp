@@ -300,12 +300,12 @@ int process_args(int argc, char ** argv, args_struct * args) {
                 break;
 
             case 'S': //extra memory regions to treat as static
-                _process_regions(&args->extra_static_regions, 
+                _process_regions(&args->extra_static_areas, 
                                  optarg, exception_str[5]);
                 break;
 
             case 'R': //exhaustive list of rw- regions to scan
-                _process_regions(&args->exclusive_rw_regions, 
+                _process_regions(&args->exclusive_rw_areas, 
                                  optarg, exception_str[6]);
                 break;
 

@@ -69,8 +69,8 @@ typedef struct {
     unsigned int max_depth;    //max tree levels
     unsigned int threads;      //number of worker threads to use
     
-    std::vector<region> extra_static_regions;  //user supplied vmas to treat as static
-    std::vector<region> exclusive_rw_regions;  //user supplied vmas to exclusively scan
+    std::vector<region> extra_static_areas;  //user supplied vmas to treat as static
+    std::vector<region> exclusive_rw_areas;  //user supplied vmas to exclusively scan
     std::vector<uintptr_t> preset_offsets;     //first n offsets (if supplied)
 
     //internal
