@@ -49,12 +49,13 @@ class mem {
 
     public:
         //methods
-        mem(args_struct * args, ui_base * ui);
+        mem(args_struct * args);
         ~mem();
         void populate_areas(args_struct * args);
 
         //getters & setters
         const int get_pid() const;
+        const ln_session * get_session() const;
         const ln_vm_map * get_map() const;
         const std::vector<cm_list_node *> * get_rw_areas() const;
         const std::vector<cm_list_node *> * get_static_areas() const;

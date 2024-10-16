@@ -20,17 +20,16 @@ add_executable(scan_debug ${SOURCES_PTRSCAN} ${HEADERS_PTRSCAN})
 target_compile_features(example_proc PUBLIC cxx_std_14)
 target_compile_options(example_proc PUBLIC -ggdb -O0 -Wall)
 
-#find libpwu
-find_library(PWU_LIB pwu)
+#find libcmore & liblain
+find_library(CMORE_LIB cmore)
+find_library(LAIN_LIB lain)
 
 #ptrscan options
 target_compile_features(scan PUBLIC cxx_std_14)
 target_compile_options(scan PUBLIC -ggdb -O0 -Wall)
-target_link_libraries(scan PUBLIC "${PWU_LIB}")
-#target_link_options(scan PUBLIC -lpthread -lpwu)
+target_link_libraries(scan PUBLIC "${CMORE_LIB} ${LAIN_LIB}")
 
 #ptrscan debug options
 target_compile_features(scan_debug PUBLIC cxx_std_14)
 target_compile_options(scan_debug PUBLIC -D DEBUG -ggdb -O0 -Wall)
-target_link_libraries(scan_debug PUBLIC "${PWU_LIB}")
-#target_link_options(scan_debug PUBLIC -lpthread -lpwu)
+target_link_libraries(scan_debug PUBLIC "${CMORE_LIB} ${LAIN_LIB}")

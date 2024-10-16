@@ -205,7 +205,7 @@ inline void mem::add_static_vma(args_struct * args, cm_list_node * vma_node) {
 // --- PUBLIC METHODS
 
 //constructor
-mem::mem(args_struct * args, ui_base * ui) :
+mem::mem(args_struct * args) :
 
     //initialiser list
     pid(interpret_target(args))
@@ -307,6 +307,11 @@ void mem::populate_areas(args_struct * args) {
 
 inline const int mem::get_pid() const {
     return this->pid;
+}
+
+
+inline const ln_session * mem::get_session() const {
+    return &this->session;
 }
 
 

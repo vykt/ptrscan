@@ -9,38 +9,30 @@
 #include "mem.h"
 #include "thread_ctrl.h"
 #include "mem_tree.h"
-#include "serialise.h"
-#include "verify.h"
-
-#ifdef DEBUG
+#include "serialiser.h"
 #include "debug.h"
-#endif
-
-//DEBUG INCLUDES
-#include <cstdio>
 
 
 
 //generate pointer tree
-void threaded_scan(args_struct * args, mem * m, mem_tree ** m_tree, ui_base * ui) {
+static inline void _do_scan(const args_struct * args, mem * m, 
+                                  mem_tree * m_tree, ui_base * ui) {
 
     //instantiate pointer map tree
     thread_ctrl * t_ctrl;
-    (*m_tree) = new mem_tree(args, m);
 
     //initialise the thread controller
-    t_ctrl = new thread_ctrl();
-    t_ctrl->init(args, m, *m_tree, ui);
+    t_ctrl = new thread_ctrl(args, m, m_tree, ui);
 
     #ifdef DEBUG
-    dump_structures_thread_work(t_ctrl);
+    dump_threads(t_ctrl);
     #endif
 
     //for every level
-    for (unsigned int i = 1; i < args->max_depth; ++i) {
+    for (int i = 1; i < args->max_depth; ++i) {
         
         //prepare the next level
-        t_ctrl->prepare_threads(args, m, *m_tree);
+        t_ctrl->prepare_threads(args, m, m_tree);
 
         //start next level
         t_ctrl->start_level();
@@ -53,170 +45,217 @@ void threaded_scan(args_struct * args, mem * m, mem_tree ** m_tree, ui_base * ui
             ui->report_depth_progress(i);
         }
 
-        #ifdef DEBUG
-        dump_structures_thread_level(t_ctrl, *m_tree, i);
-        #endif
-
     } //end for every level
 
     //wait on threads to terminate
-    t_ctrl->wait_thread_terminate();
+    t_ctrl->join_threads();
+
+    #ifdef DEBUG
+    dump_mem_tree(m_tree);
+    #endif
+
+    return;
 }
 
 
-//main
+static inline void _mode_scan(args_struct * args, mem * m,
+                              mem_tree * m_tree, serialiser * s, ui_base * ui) {
+
+    //populate rw-/rwx & static areas
+    m->populate_areas(args);
+
+    //carry out scan
+    _do_scan(args, m, m_tree, ui); 
+    
+    //serialise results
+    s->serialise_tree(args, m, m_tree);
+
+    #ifdef DEBUG
+    dump_serialiser(s);
+    #endif
+
+    //output results
+    ui->output_ptrchains(args, s, m);
+
+    return;
+}
+
+
+static inline void _mode_scan_write(args_struct * args, mem * m,
+                                    mem_tree * m_tree, serialiser * s, ui_base * ui) {
+
+    //populate rw-/rwx & static areas
+    m->populate_areas(args);
+
+    //carry out scan
+    _do_scan(args, m, m_tree, ui); 
+    
+    //serialise results
+    s->serialise_tree(args, m, m_tree);
+
+    //save results
+    s->record_pscan(args, m);
+
+    #ifdef DEBUG
+    dump_serialiser(s);
+    #endif 
+
+    //output results
+    ui->output_ptrchains(args, s, m);
+
+    return;
+}
+
+
+static inline void _mode_read(args_struct * args, mem * m,
+                              mem_tree * m_tree, serialiser * s, ui_base * ui) {
+
+    //read results
+    s->read_pscan(args, m);
+
+    //output results
+    ui->output_ptrchains(args, s, m);
+
+    return;
+}
+
+
+static inline void _mode_verify(args_struct * args, mem * m,
+                                mem_tree * m_tree, serialiser * s, ui_base * ui) {
+
+    //read results
+    s->read_pscan(args, m);
+
+    //verify results
+    s->verify(args, m);
+
+    #ifdef DEBUG
+    dump_serialiser(s);
+    #endif
+
+    //output results
+    ui->output_ptrchains(args, s, m);
+
+    return;
+}
+
+
+
+static inline void _mode_verify_write(args_struct * args, mem * m,
+                                      mem_tree * m_tree, serialiser * s, 
+                                      ui_base * ui) {
+
+    //read results
+    s->read_pscan(args, m);
+
+    //verify results
+    s->verify(args, m);
+
+    //save results
+    s->record_pscan(args, m);
+
+    #ifdef DEBUG
+    dump_serialiser(s);
+    #endif
+
+    //output results
+    ui->output_ptrchains(args, s, m);
+
+    return;
+}
+
+
 int main(int argc, char ** argv) {
 
     int mode;
 
-    //allocated here
+    //options
     args_struct args;
-    proc_mem p_mem;
-    serialise ser;
-
+    
+    //objects
+    mem * m;
+    mem_tree * m_tree;
+    serialiser * s;
     ui_base * ui;
 
-    //allocated in called functions
-    mem_tree * m_tree;
 
+    // --- STAGE 1: setup
 
-
-    //STAGE I - INPUT
-
-    //process cmdline arguments
     try {
+        //process cmdline arguments
         mode = process_args(argc, argv, &args);
+
+        //instantiate ui
+        if (args.ui_type == UI_TERM) {
+            ui = new ui_term();
+        } else {
+            //TODO ncurses interface goes here, for now use term
+            ui = new ui_term();
+        }
+
+        //instantiate memory manager
+        m = new mem(&args);
+
+        //instantiate memory tree
+        m_tree = new mem_tree(&args, m);
+
+        //instantiate a serialiser
+        s = new serialiser();
+
     } catch (const std::runtime_error& e) {
         std::cerr << e.what() << std::endl; //only handle ui exception this way
         return -1;
     }
 
-    //instantiate ui
-    if (args.ui_type == UI_TERM) {
-        ui = new ui_term();
-    } else {
-        //TODO ncurses interface goes here, for now use term
-        ui = new ui_term();
-    }
-
-    //instantiate memory object
-    try {
-        p_mem.init_proc_mem(&args, ui);
-    } catch (const std::runtime_error& e) {
-        ui->report_exception(e);
-        return -1;
-    }
 
     #ifdef DEBUG
-    dump_structures_init(&args, &p_mem);
+    dump_args(&args);
+    dump_mem(m);
     #endif
 
-    //STAGE II - PROCESS MODE
 
-    /*
-     *  This switch statement can be made a lot more concise at the cost of clarity.
-     */
+    // --- STAGE 2: processing
+    try {
 
-    //switch based on return from process_args()
-    switch (mode) {
+        //switch based on return from process_args()
+        switch (mode) {
 
-        //scan and output results, do not save to a file
-        case MODE_SCAN:
-            
-            try {
-                //carry out scan
-                threaded_scan(&args, &p_mem, &m_tree, ui); 
-                
-                //serialise results
-                ser.tree_to_results(&args, &p_mem, m_tree);
+            //scan and output results, do not save to a file
+            case MODE_SCAN:
 
-                //output results
-                ui->output_serialised_results(&args, &ser, &p_mem);
-            } catch (std::runtime_error& e) {
-                ui->report_exception(e);
-            }
-
-            break;
-
-        //scan, output results and save to a file
-        case MODE_SCAN_WRITE:
-
-            try {
-                //carry out scan
-                threaded_scan(&args, &p_mem, &m_tree, ui); 
-                
-                //serialise results
-                ser.tree_to_results(&args, &p_mem, m_tree);
-
-                //write results to disk
-                ser.write_mem_ptrchains(&args, &p_mem);
-
-                //output results
-                ui->output_serialised_results(&args, &ser, &p_mem);
-            } catch (std::runtime_error& e) {
-                ui->report_exception(e);
-            }
-            
-            break;
-
-        //do not scan, only print results read from a file
-        case MODE_READ:
-
-            try {
-                //read results from disk
-                ser.read_disk_ptrchains(&args);
-
-                //output results
-                ui->output_serialised_results(&args, &ser, &p_mem);
-            } catch (std::runtime_error& e) {
-                ui->report_exception(e);
-            }
-
-            break;
-
-        //rescan based on file, print results, do not save to file
-        case MODE_RESCAN:
-
-            try {
-                //read results from disk
-                ser.read_disk_ptrchains(&args);
-
-                //verify results
-                verify(&args, &p_mem, ui, &ser);
-
-                //output results
-                ui->output_serialised_results(&args, &ser, &p_mem);
-            } catch (std::runtime_error& e) {
-                ui->report_exception(e);
-            }
+                _mode_scan(&args, m, m_tree, s, ui);
+                break;
 
 
-            break;
+            //scan, output results and save to a file
+            case MODE_SCAN_WRITE:
 
-        //rescan based on file, print results, save to a file
-        case MODE_RESCAN_WRITE:
+                _mode_scan_write(&args, m, m_tree, s, ui);
+                break;
 
-            try {
-                //read results from disk
-                ser.read_disk_ptrchains(&args);
+            //do not scan, only print results read from a file
+            case MODE_READ:
 
-                //verify results
-                verify(&args, &p_mem, ui, &ser);
+                _mode_read(&args, m, m_tree, s, ui);
+                break;
 
-                //write results to disk
-                ser.write_mem_ptrchains(&args, &p_mem);
+            //rescan based on file, print results, do not save to file
+            case MODE_VERIFY:
 
-                //output results
-                ui->output_serialised_results(&args, &ser, &p_mem);
-            } catch (std::runtime_error& e) {
-                ui->report_exception(e);
-            }
+                _mode_verify(&args, m, m_tree, s, ui);
+                break;
 
-            break;
+            //rescan based on file, print results, save to a file
+            case MODE_VERIFY_WRITE:
 
-    } //end switch
+                _mode_verify_write(&args, m, m_tree, s, ui);
+                break;
 
-    //std::cout << "press enter to terminate." << std::endl;
-    //getchar();
+        } //end switch
+    
+    } catch (std::runtime_error & e) {
+        ui->report_exception(e);
+    }
 
+    return 0;
 }

@@ -59,6 +59,8 @@ class mem_node {
         const mem_node * add_child(const mem_node * child);
 
         //getters & setters
+        const int get_id() const;
+
         const int get_rw_areas_index() const;
         const int get_static_areas_index() const;
         

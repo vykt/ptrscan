@@ -92,6 +92,7 @@ class thread {
         const int get_ui_id() const;
         void set_ui_id(int ui_id);
 
+        const std::vector<vma_scan_range> * get_vma_scan_ranges() const;
         void add_vma_scan_range(vma_scan_range range);
 };
 

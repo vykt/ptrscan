@@ -2,12 +2,17 @@
 #define DEBUG_H
 
 #include "args.h"
-#include "proc_mem.h"
-#include "thread_ctrl.h"
+#include "mem.h"
 #include "mem_tree.h"
+#include "thread_ctrl.h"
+#include "serialiser.h"
 
-void dump_structures_init(args_struct * args, proc_mem * p_mem);
-void dump_structures_thread_work(thread_ctrl * t_ctrl);
-void dump_structures_thread_level(thread_ctrl * t_ctrl, mem_tree * m_tree, int lvl);
+
+void dump_args(const args_struct * args);
+void dump_mem(const mem * m);
+void dump_mem_tree(const mem_tree * m_tree, const args_struct * args);
+void dump_threads(const thread_ctrl * t_ctrl);
+void dump_serialiser(const serialiser * s);
+
 
 #endif

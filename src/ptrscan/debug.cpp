@@ -4,281 +4,482 @@
 
 #include <linux/limits.h>
 
+#include <libcmore.h>
+#include <liblain.h>
+
 #include "args.h"
-#include "proc_mem.h"
+#include "mem.h"
+#include "mem_tree.h"
 #include "thread_ctrl.h"
 #include "thread.h"
-#include "mem_tree.h"
-
-//for init dump
-#define ARGS_MEMBERS 7
-#define STATIC_REGION_MEMBERS 3
-#define PROC_MEM_MEMBERS 5   //dont look at maps_data
-#define MAPS_ENTRY_MEMBERS 4 //ignore caves member
-
-//for gen tree dump
-#define THREAD_CTRL_MEMBERS 3
-#define THREAD_MEMBERS 2       //ignore level_barrier member
-#define PARENT_RANGE_MEMBERS 3
-#define MEM_RANGE_MEMBERS 3
-#define MEM_TREE_MEMBERS 2     //ignore write_mutex member
-#define MEM_NODE_MEMBERS 6
+#include "serialiser.h"
 
 
-/*
- *  print to stderr & don't go through UI class (ncurses for debugging? :p)
- */
-
-/*
- *  the odd spacing in the std::cerr's is to align the values
- */
-
-/*
- *  as structure dumps grew in size this file become a cluster****, at some 
- *  point in the future it might be worthwhile to write a few generic member dump
- *  functions and use them instead of specifying the formatting by hand each time
- */
-
-//dump args & libpwu memory structures
-void dump_structures_init(args_struct * args, proc_mem * p_mem) {
-
-    //args_structure members
-    const char * a_mbr[ARGS_MEMBERS] = {
-        "target_str",         //std::string
-        "ui_type",            //byte
-        "aligned",            //bool
-        "ptr_lookback",       //uintptr_t
-        "levels",             //unsigned int
-        "num_threads",        //unsigned int
-        "extra_static_vector" //std::vector<region>
-    };
-
-    //region members
-    const char * sr_mbr[STATIC_REGION_MEMBERS] {
-        "pathname", //std::string
-        "skip",     //int
-        "skipped"   //int
-    };
-
-    const char * pm_mbr[PROC_MEM_MEMBERS] {
-        "pid",                  //pid_t
-        "mem_fd",               //int
-        "maps_stream",          //FILE *
-        "rw_regions_vector",    //std::vector<maps_entry *>
-        "static_regions_vector" //std::vector<maps_entry *>
-    };
-
-    //maps_entry members, pulled from man 3 libpwu_structs
-    const char * me_mbr[MAPS_ENTRY_MEMBERS] {
-        "pathname",   //char[PATH_MAX]
-        "perms",      //byte
-        "start_addr", //void * (uintptr_t)
-        "end_addr"    //void * (uintptr_t)
-    };
+#define TAB   "\t"
+#define NL    "\n"
+#define SPACE " "
 
 
-    //start dump
-    std::cerr << "\n*** *** *** *** *** [INIT DUMP] *** *** *** *** ***\n";
+static inline void _dump_offsets(std::vector<uint32_t> offsets) {
 
-    //dump args structure
-    std::cerr << "[DEBUG] --- (args_struct args) --- CONTENTS:\n";
-    std::cerr << a_mbr[0] << "   : " << args->target_str << '\n'
-              << a_mbr[1] << "      : " << (unsigned int) args->ui_type << '\n'
-              << a_mbr[2] << "      : " << args->aligned << '\n'
-              << a_mbr[3] << " : 0x" << std::hex << args->ptr_lookback << '\n'
-              << a_mbr[4] << "       : " << std::dec << args->levels << '\n'
-              << a_mbr[5] << "       : " << args->num_threads << '\n'
-              << " --- " << a_mbr[6] << ": \n";
-    
-    //dump args.extra_static_vector
-    for (unsigned int i = 0; i < args->extra_static_vector.size(); ++i) {
-        std::cerr << '\n' << '\t' 
-                  << "[DEBUG] --- (" << a_mbr[6] << ")[" << std::dec << i << "]:\n";
-        std::cerr << '\t' << sr_mbr[0] << " : " 
-                  << args->extra_static_vector[i].pathname << '\n'
-                  << '\t' << sr_mbr[1] << "     : "
-                  << args->extra_static_vector[i].skip << '\n'
-                  << '\t' << sr_mbr[2] << "  : "
-                  << args->extra_static_vector[i].skipped << '\n';
-    } //end for
-    
-    //dump p_mem part 1
-    std::cerr << '\n' << "[DEBUG] --- (proc_mem p_mem) --- CONTENTS:\n";
-    std::cerr << pm_mbr[0] << "         : " <<  std::dec << p_mem->pid << '\n'
-              << pm_mbr[1] << "      : " << p_mem->mem_fd << '\n'
-              << pm_mbr[2] << " : 0x" 
-                           << std::hex << (uintptr_t) p_mem->maps_stream << '\n'
-              << " --- " << pm_mbr[3] << ": \n";
+    std::cerr << std::hex;
 
-    //dump std::vector<maps_entry *> p_mem.rw_regions_vector;
-    for (unsigned int i = 0; i < p_mem->rw_regions_vector.size(); ++i) {
+    //for every offset
+    for (int i = 0; i < offsets.size(); ++i) {
+        std::cerr << "+0x" << offsets[i] << SPACE;
+    }
 
-        std::cerr << '\n' << '\t'
-                  << "[DEBUG] --- (" << pm_mbr[3] << ")[" << i << "]:\n";
-        std::cerr << '\t' << me_mbr[0] << "   : " 
-                  << p_mem->rw_regions_vector[i]->pathname << '\n'
-                  << '\t' << me_mbr[1] << "      : "
-                  << (unsigned int) p_mem->rw_regions_vector[i]->perms << '\n'
-                  << '\t' << me_mbr[2] << " : 0x"
-                  << (uintptr_t) p_mem->rw_regions_vector[i]->start_addr << '\n'
-                  << '\t' << me_mbr[3] << "   : 0x"
-                  << (uintptr_t) p_mem->rw_regions_vector[i]->end_addr << '\n';
-    } //end for
+    std::cerr << std::dec << NL;
 
-    //dumo p_mem part 2
-    std::cerr << '\n' << " --- " << pm_mbr[4] << ": \n";
-
-    //dump std::vector<maps_entry *> p_mem.static_regions_vector;
-    for (unsigned int i = 0; i < p_mem->static_regions_vector.size(); ++i) {
-    
-        std::cerr << '\n' << '\t'
-                  << "[DEBUG] --- (" << pm_mbr[4] << ")[" << i << "]:\n";
-        std::cerr << '\t' << me_mbr[0] << "   : " 
-                  << p_mem->static_regions_vector[i]->pathname << '\n'
-                  << '\t' << me_mbr[1] << "      : "
-                  << (unsigned int) p_mem->static_regions_vector[i]->perms << '\n'
-                  << '\t' << me_mbr[2] << " : 0x"
-                  << (uintptr_t) p_mem->static_regions_vector[i]->start_addr << '\n'
-                  << '\t' << me_mbr[3] << "   : 0x"
-                  << (uintptr_t) p_mem->static_regions_vector[i]->end_addr << '\n';
-
-    } //end for
+    return;
 }
 
 
-//dump division of work between threads
-void dump_structures_thread_work(thread_ctrl * t_ctrl) {
+static inline void _dump_parent(const mem_node * m_node) {
 
-    //mem_range members
-    const char * mr_mbr[MEM_RANGE_MEMBERS] = {
-        "m_entry    : 0x", //maps_entry *
-        "start_addr : 0x", //uintptr_t
-        "end_addr   : 0x"  //uintptr_t
-    };
+    if (m_node->get_parent() == nullptr) {
+        std::cerr << "<null>" << NL;
+    } else {
+        std::cerr << m_node->get_parent()->get_id() << NL;
+    }
 
-    //thread members
-    const char * t_mbr[THREAD_MEMBERS] = {
-        "id: ",           //pthread_t (some kind of integer on Linux)
-        "regions_to_scan" //std::vector<mem_range>
-    };
+    return;
+}
 
-    //start dump
-    std::cerr << "\n*** *** *** *** *** [THREAD WORK DUMP] *** *** *** *** ***\n";
 
-    //dump thread_ctrl.thread_vector
-    for (unsigned int i = 0; i < (unsigned int) t_ctrl->thread_vector.size(); ++i) {
-        std::cerr << '\n'
-                  << "[DEBUG] --- (thread_vector)[" << i << "]:";
-        std::cerr << t_mbr[0]
-                  << t_ctrl->thread_vector[i].human_thread_id << '\n';
+static inline void _dump_children(const std::list<mem_node> * children) {
 
-        //dump thread_ctrl.thread_vector[i].regions_to_scan
-        for (unsigned int j = 0; 
-             j < (unsigned int) t_ctrl->thread_vector[i].regions_to_scan.size(); ++j) {
+    for (std::list<mem_node>::iterator it = 
+         ((std::list<mem_node> *) children)->begin(); it != children->end(); ++it) {
 
-            std::cerr << '\n' << '\t'
-                      << "[DEBUG] --- (" << t_mbr[1] << ")[" << j << "]:";
-            std::cerr << '\t' << mr_mbr[0]
-                      << std::hex
-                      << t_ctrl->thread_vector[i].regions_to_scan[j].m_entry << '\n'
-                      << '\t' << mr_mbr[1]
-                      << std::hex
-                      << t_ctrl->thread_vector[i].regions_to_scan[j].start_addr << '\n'
-                      << '\t' << mr_mbr[2]
-                      << std::hex
-                      << t_ctrl->thread_vector[i].regions_to_scan[j].end_addr << '\n';
-        } //end inner for
-    } //end for
+        std::cerr << it->get_id() << SPACE;
+    }
+
+    std::cerr << NL;
 
 }
 
 
-//dump thread control level
-void dump_structures_thread_level(thread_ctrl * t_ctrl, mem_tree * m_tree, int lvl) {
+static inline void _dump_access(cm_byte access) {
 
-    //thread_ctrl object members
-    const char * tc_mbr[THREAD_CTRL_MEMBERS] = {
-        "current_level: ",        //unsigned int
-        "parent_range_vector",    //std::vector<parent_range>
-        "thread_vector"           //std::vector<thread>
-    };
+    const char letters[3] = {'r', 'w', 'x'};
+    const char masks[3]   = {LN_ACCESS_READ, LN_ACCESS_WRITE, LN_ACCESS_EXEC};
 
-    //parent_range members
-    const char * pr_mbr[PARENT_RANGE_MEMBERS] = {
-        "parent_node (id) : ",   //mem_node * (unsigned int)
-        "start_addr       : 0x", //uintptr_t
-        "end_addr         : 0x"  //uintptr_t
-    };
+    for (int i = 0; i < 3; ++i) {
+        if (access & masks[i]) {
+            std::cerr << letters[i];
+        } else {
+            std::cerr << '-';
+        }
+    }
 
-    //mem_tree members
-    const char * mt_mbr[MEM_TREE_MEMBERS] = {
-        "root_node (id): ",  //const mem_node * (unsigned int)
-        "levels"             //std::vector<std::list<mem_node *>> * levels
-    };
+    if (access & LN_ACCESS_SHARED) {
+        std::cerr << 's';
+    } else {
+        std::cerr << 'p';
+    }
 
-    //args_structure members
-    const char * mn_mbr[MEM_NODE_MEMBERS] = {
-        "id                   : ",   //unsigned int
-        "static_regions_index : ",   //int
-        "node_addr            : 0x", //node_addr
-        "point_addr           : 0x", //point_addr
-        "parent_node (id)     : ",   //mem_node * (unsigned int)
-        "subnode_list (size)  : "    //std::list<mem_node> (int)
-    };
+    std::cerr << NL;
 
-    //pointer to m_tree->levels[i] for easier iteration
-    std::list<mem_node *> * level_list;
+    return;
+}
 
 
-    //start dump
-    std::cerr << "\n*** *** *** *** *** [THREAD LEVEL DUMP: "
-              << lvl 
-              << "] *** *** *** *** ***\n";
+static inline void _dump_area_link(const cm_list_node * area_node) {
 
-    //dump thread_ctrl object (and its constituent threads)
-    std::cerr << "\n[DEBUG] --- (thread_ctrl t_ctrl) --- CONTENTS:\n";
-    std::cerr << tc_mbr[0] << t_ctrl->current_level << '\n';
+    ln_vm_area * area;
+    
+    area = LN_GET_NODE_AREA(area_node);
+    std::cerr << area->id << NL;
 
-    //dump thread_ctrl.parent_range_vector
-    for (unsigned int i = 0; 
-         i < (unsigned int) t_ctrl->parent_range_vector.size(); ++i) {
+    return;
+}
+
+
+//for ln_vm_obj's vma_area_node_ptrs
+static inline void _dump_area_all_link(cm_list * objs) {
+
+    cm_list_node * area_node;
+    ln_vm_area * area;
+
+    for (int i = 0; i < objs->len; ++i) {
+
+        cm_list_get_val(objs, i, (cm_byte *) &area_node);
+        area = LN_GET_NODE_AREA(area_node);
+
+        std::cerr << area->id << SPACE;
+
+    }
+
+    std::cerr << NL;
+
+    return;
+}
+
+
+static inline void _dump_obj_link(const cm_list_node * obj_node) {
+
+    ln_vm_obj * obj;
+
+    if (obj_node == nullptr) {
+        std::cerr << "<null>" << NL;
+    } else {
+        obj = LN_GET_NODE_OBJ(obj_node);
+        std::cerr << obj->id << NL;
+    }
+
+    return;
+}
+
+
+static inline void _dump_regions(std::string prefix, std::vector<region> regions) {
+
+    region * r;
+
+    for (int i = 0; i < regions.size(); ++i) {
         
-        std::cerr << '\n' << '\t'
-                  << "[DEBUG] --- (" << tc_mbr[1] << ")[" << i << "]:" << '\n';
-        std::cerr << '\t' << pr_mbr[0]
-                  << std::dec << t_ctrl->parent_range_vector[i].parent_node->id << '\n'
-                  << '\t' << pr_mbr[1]
-                  << std::hex << t_ctrl->parent_range_vector[i].start_addr << '\n'
-                  << '\t' << pr_mbr[2]
-                  << std::hex << t_ctrl->parent_range_vector[i].end_addr << '\n';
-    } //end for
+        r = &regions[i];
+        
+        std::cerr << prefix << "  [region " << i << "]" << NL;
+        std::cerr << prefix << TAB << "pathname:     " << r->pathname << NL;
+        std::cerr << prefix << TAB << "skip/skipped: " << r->skip << "/" << r->skipped 
+                                                       << NL;
+    }
+
+    return;
+}
 
 
-    //dump memory tree
-    std::cerr << "\n[DEBUG] --- (mem_tree m_tree) --- CONTENTS:\n";
-    std::cerr << mt_mbr[0] << m_tree->root_node->id << '\n';
+static inline void _dump_args_struct(std::string prefix, const args_struct * args) {
 
-    //dump memory nodes for level
-    level_list = &(*m_tree->levels)[lvl];
-    for (std::list<mem_node *>::iterator it = level_list->begin();
-         it != level_list->end(); ++it) {
+    const char * ui_types[2]  = {"TERM", "NCURSES"};
+    const char * ln_ifaces[2] = {"LAINKO", "PROCFS"};
 
-        std::cerr << '\n' << '\t'
-                  << "[DEBUG] --- (" << mt_mbr[1] << ")[" << lvl << "]:" << '\n';
-        std::cerr << '\t' << mn_mbr[0]
-                  << std::dec << (*it)->id << '\n'
-                  << '\t' << mn_mbr[1]
-                  << std::dec << (*it)->static_regions_index << '\n'
-                  << '\t' << mn_mbr[2]
-                  << std::hex << (*it)->node_addr << '\n'
-                  << '\t' << mn_mbr[3]
-                  << std::hex << (*it)->point_addr << '\n'
-                  << '\t' << mn_mbr[4]
-                  << std::dec << (*it)->parent_node->id << '\n'
-                  << '\t' << mn_mbr[5]
-                  << std::dec << (*it)->subnode_list.size() << '\n';
-    } //end for
+    std::cerr << prefix << "  [args_struct]" << NL << NL; 
+    
+    std::cerr << prefix << TAB << "target_str:         " << args->target_str << NL;
+    std::cerr << prefix << TAB << "output_file:        " << args->output_file << NL;
+    std::cerr << prefix << TAB << "input_file:         " << args->input_file << NL;
+    std::cerr << prefix << NL;
 
-    //dump 
+    std::cerr << prefix << TAB << "ui_type:            " << ui_types[args->ui_type] 
+                                                         << NL;
+    std::cerr << prefix << TAB << "ln_iface:           " << ln_ifaces[args->ln_iface] 
+                                                         << NL;
+    std::cerr << NL;
 
+    std::cerr << prefix << TAB << "colour:             " << args->colour << NL;
+    std::cerr << prefix << TAB << "verbose:            " << args->verbose << NL;
+    std::cerr << prefix << TAB << "aligned:            " << args->aligned << NL;
+    std::cerr << prefix << TAB << "use_preset_offsets: " << args->use_preset_offsets 
+        << NL;
+    std::cerr << prefix << NL;
+
+    std::cerr << prefix << TAB << "bit_width:          " << args->bit_width << NL;
+    std::cerr << prefix << TAB << "target_addr:        " << std::hex 
+                                                         << args->target_addr 
+                                                         << std::dec << NL;
+    std::cerr << NL;
+
+    std::cerr << prefix << TAB << "max_struct_size:    " << args->max_struct_size 
+                                                         << NL;
+    std::cerr << prefix << TAB << "max_depth:          " << args->max_depth << NL;
+    std::cerr << prefix << TAB << "threads:            " << args->threads << NL;
+
+    std::cerr << prefix << TAB << "extra_static_areas: " << NL << NL;
+    _dump_regions(prefix + TAB, args->extra_static_areas);
+
+    std::cerr << prefix << TAB << "exclusive_rw_areas: " << NL << NL;
+    _dump_regions(prefix + TAB, args->exclusive_rw_areas);
+
+    std::cerr << prefix << TAB << "preset offsets:     ";
+    _dump_offsets(args->preset_offsets);
+    std::cerr << NL;
+
+    return;
+}
+
+
+static inline void _dump_areas(std::string prefix, std::vector<cm_list_node *> areas) {
+
+    cm_list_node * area_node;
+    ln_vm_area * area;
+
+    for (int i = 0; i < areas.size(); ++i) {
+
+        area_node = areas[i];
+        area = LN_GET_NODE_AREA(area_node);
+
+        std::cerr << prefix << "  [ln_vm_area]" << NL << NL;
+        
+        std::cerr << prefix << TAB << "pathname:          " << area->pathname << NL;
+        std::cerr << prefix << TAB << "basename:          " << area->basename << NL;
+        std::cerr << NL;
+
+        std::cerr << prefix << TAB << "start_addr:        " << std::hex << "0x"
+                                                            << area->start_addr
+                                                            << std::dec << NL;
+        std::cerr << prefix << TAB << "end_addr:          " << std::hex << "0x"
+                                                            << area->end_addr
+                                                            << std::dec << NL;
+        std::cerr << NL;
+
+        std::cerr << prefix << TAB << "access:            ";
+        _dump_access(area->access);
+        std::cerr << NL;
+
+        std::cerr << prefix << TAB << "obj_node_ptr:      ";
+        _dump_obj_link(area->obj_node_ptr);
+        std::cerr << prefix << TAB << "last_obj_node_ptr: ";
+        _dump_obj_link(area->obj_node_ptr);
+        std::cerr << NL;
+
+        std::cerr << prefix << TAB << "id:                " << area->id << NL;
+        std::cerr << prefix << TAB << "mapped:            " << area->mapped << NL;
+    }
+
+    return;
+}
+
+
+static inline void _dump_objs(std::string prefix, 
+                              const std::vector<cm_list_node *> * objs) {
+
+    cm_list_node * obj_node;
+    ln_vm_obj * obj;
+
+    for (int i = 0; i < objs->size(); ++i) {
+
+        obj_node = (*objs)[i];
+        
+        if (obj_node == nullptr) {
+            std::cerr << prefix << "  [ln_vm_obj] <null>" << NL << NL;
+            continue;
+        }
+
+
+        obj = LN_GET_NODE_OBJ(obj_node);
+
+        std::cerr << prefix << "  [ln_vm_obj]" << NL << NL;
+
+        std::cerr << prefix << TAB << "pathname:          " << obj->pathname << NL;
+        std::cerr << prefix << TAB << "basename:          " << obj->basename << NL;
+        std::cerr << NL;
+
+        std::cerr << prefix << TAB << "start_addr:        " << std::hex << "0x"
+                                                            << obj->start_addr
+                                                            << std::dec << NL;
+        std::cerr << prefix << TAB << "end_addr:          " << std::hex << "0x"
+                                                            << obj->end_addr
+                                                            <<std::dec << NL;
+        std::cerr << NL;
+
+        std::cerr << prefix << TAB << "id:                " << obj->id << NL;
+        std::cerr << prefix << TAB << "mapped:            " << obj->mapped << NL;
+
+        std::cerr << prefix << TAB << "vm_area_node_ptrs: ";
+        _dump_area_all_link(&obj->vm_area_node_ptrs);
+        std::cerr << NL;
+    }
+
+    return;
+}
+
+
+static inline void _dump_mem(std::string prefix, const mem * m) {
+
+    std::cerr << prefix << "  [mem]" << NL << NL;
+
+    std::cerr << prefix << TAB << "pid:          " << m->get_pid() << NL;
+    std::cerr << prefix << TAB << "session:      " << std::hex << "0x" 
+                                                   << (uintptr_t) m->get_session()
+                                                   << std::dec << NL;
+    std::cerr << prefix << TAB << "map:          " << std::hex << "0x" 
+                                                   << (uintptr_t) m->get_map()
+                                                   << std::dec << NL;
+    
+    std::cerr << prefix << TAB << "rw_areas:     " << NL << NL;
+    _dump_areas(prefix + TAB, *m->get_rw_areas());
+    std::cerr << prefix << TAB << "static_areas: " << NL << NL;
+    _dump_areas(prefix + TAB, *m->get_static_areas());
+    std::cerr << NL;
+
+    return;
+}
+
+
+static inline void _dump_mem_node(std::string prefix, const mem_node * m_node) {
+
+    std::cerr << prefix << "  [mem_node]" << NL << NL;
+
+    std::cerr << prefix << TAB << "rw_areas_index:     " << m_node->
+                                                            get_rw_areas_index()
+                                                         << NL;
+    std::cerr << prefix << TAB << "static_areas_index: " << m_node->
+                                                            get_static_areas_index()
+                                                         << NL;
+    std::cerr << NL;
+
+    std::cerr << prefix << TAB << "addr:               " << std::hex << "0x"
+                                                         << m_node->get_addr()
+                                                         << std::dec << NL;
+    std::cerr << prefix << TAB << "ptr_addr:           " << std::hex << "0x"
+                                                         << m_node->get_ptr_addr()
+                                                         << std::dec << NL;
+    std::cerr << NL;
+
+    std::cerr << prefix << TAB << "vma_node:           ";
+    _dump_area_link(m_node->get_vma_node());
+    std::cerr << NL;
+
+    std::cerr << prefix << TAB << "parent:             ";
+    _dump_parent(m_node);
+    std::cerr << prefix << TAB << "children:           ";
+    _dump_children(m_node->get_children());
+
+
+    return;
+}
+
+
+static inline void _dump_level(std::string prefix, 
+                               std::list<mem_node *> * level, int index) {
+
+    std::cerr << "  [level " << index << "]" << NL << NL;
+    for (std::list<mem_node *>::iterator it = 
+         level->begin(); it != level->end(); ++it) {
+
+        _dump_mem_node(prefix + TAB, *it);
+    }
+
+    std::cerr << NL;
+}
+
+
+static inline void _dump_mem_tree(std::string prefix, const mem_tree * m_tree,
+                                  const args_struct * args) {
+
+    std::list<mem_node *> * level;
+
+    std::cerr << prefix << "root_node: " << m_tree->get_root_node()->get_id() << NL;
+    std::cerr << NL;
+
+    std::cerr << prefix << "  [mem_tree]" << NL << NL;
+    
+    for (int i = 0; i < args->max_depth; ++i) {
+        level = m_tree->get_level_list(i);
+        _dump_level(prefix + TAB, level, i);
+    }
+
+    return;
+}
+
+
+static inline void _dump_vma_scan_ranges(std::string prefix, 
+                                         const std::vector<vma_scan_range> * ranges) {
+
+    vma_scan_range * range;
+
+    for (int i = 0; i < ranges->size(); ++i) {
+        
+        range = &(* (std::vector<vma_scan_range> *) ranges)[i];
+
+        std::cerr << prefix << "  [vma_scan_range " << i << "]" << NL << NL;
+
+        std::cerr << prefix << TAB << "start_addr: " << std::hex << "0x"
+                                                     << range->start_addr
+                                                     << std::dec << NL;
+        std::cerr << prefix << TAB << "end_addr:   " << std::hex << "0x"
+                                                     << range->end_addr
+                                                     << std::dec << NL;
+        std::cerr << prefix << TAB << "vma_node:   ";
+        _dump_area_link(range->vma_node);        
+        std::cerr << NL;
+    }
+
+    return;
+}
+
+
+static inline void _dump_threads(std::string prefix, 
+                                 const std::vector<thread> * threads) {
+
+    thread * t;
+
+    for (int i = 0; i < threads->size(); ++i) {
+
+        t = &(* (std::vector<thread> *) threads)[i];
+        
+        std::cerr << prefix << "  [thread " << i << "]" << NL << NL;
+        
+        std::cerr << prefix << TAB << "ui_id:           " << t->get_ui_id() << NL;
+        std::cerr << prefix << TAB << "vma_scan_ranges: " << NL << NL;
+        _dump_vma_scan_ranges(prefix + TAB, t->get_vma_scan_ranges());
+    }
+
+    return;
+}
+
+
+static inline void _dump_thread_ctrl(std::string prefix, 
+                                     const thread_ctrl * t_ctrl) {
+
+    std::cerr << prefix << "  [thread_ctrl]" << NL << NL;
+
+    _dump_threads(prefix + TAB, t_ctrl->get_threads());
+
+    return;
+}
+
+
+static inline void _dump_serialiser(std::string prefix, const serialiser * s) {
+
+    std::cerr << prefix << "  [serialiser]" << NL << NL;
+
+    std::cerr << prefix << TAB << "bit_width: " << (int) s->get_bit_width() << NL;
+    std::cerr << prefix << TAB << "ptrchains: " << "<see stdout>" << NL;
+    std::cerr << NL;
+
+    std::cerr << prefix << TAB << "rw_objs: " << NL;
+    _dump_objs(prefix + TAB, s->get_rw_objs());
+
+    return;
+}
+
+
+void __attribute__((noinline)) dump_args(const args_struct * args) {
+
+    _dump_args_struct("", args);
+
+    return;
+}
+
+
+void __attribute__((noinline)) dump_mem(const mem * m) {
+
+    _dump_mem("", m);
+
+    return;
+}
+
+void __attribute__((noinline)) dump_mem_tree(const mem_tree * m_tree,
+                                             const args_struct * args) {
+
+    _dump_mem_tree("", m_tree, args);
+
+    return;
+}
+
+void __attribute__((noinline)) dump_threads(const thread_ctrl * t_ctrl) {
+
+    _dump_thread_ctrl("", t_ctrl);
+
+    return;
+}
+
+void __attribute__((noinline)) dump_serialiser(const serialiser * s) {
+
+    _dump_serialiser("", s);
+
+    return;
 }

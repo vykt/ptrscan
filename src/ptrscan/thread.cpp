@@ -312,6 +312,12 @@ inline void thread::set_ui_id(int ui_id) {
     return;
 }
 
+
+inline const std::vector<vma_scan_range> * thread::get_vma_scan_ranges() const {
+    return &this->vma_scan_ranges;
+}
+
+
 inline void thread::add_vma_scan_range(vma_scan_range range) {
     this->vma_scan_ranges.push_back(range);
     return;

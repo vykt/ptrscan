@@ -1,5 +1,5 @@
-#ifndef SERIALISE_H
-#define SERIALISE_H
+#ifndef SERIALISER_H
+#define SERIALISER_H
 
 #include <vector>
 
@@ -22,7 +22,7 @@ typedef struct {
 
     uint32_t rw_objs_index;
     uint32_t static_objs_index;
-    std::vector<uint32_t> offset_vector;
+    std::vector<uint32_t> offsets;
 
 } serial_entry;
 
@@ -56,13 +56,25 @@ class serialiser {
                             serial_entry * s_entry, const uintptr_t last_ptr);
         void recurse_down(const args_struct * args, const mem * m, 
                           const mem_node * m_node, unsigned int current_depth);
+        bool verify_chain(const args_struct * args, 
+                          const mem * m, const serial_entry * s_entry);
+        void remove_invalid_objs(const int start_rw_index, 
+                                 const int start_static_index);
+        void cleanup_intermediate();
 
     public:
         //methods
-        void serialise_tree(const args_struct * args, 
-                            const mem * m, const mem_tree * m_tree);
         void record_pscan(const args_struct * args, const mem * m);
         void read_pscan(const args_struct * args, const mem * m);
+        void serialise_tree(const args_struct * args, 
+                            const mem * m, const mem_tree * m_tree);
+        void verify(const args_struct * args, const mem * m);
+
+        //getters & setters
+        cm_byte get_bit_width() const;
+        const std::vector<serial_entry> * get_ptrchains() const;
+        const std::vector<cm_list_node *> * get_rw_objs() const;
+        const std::vector<cm_list_node *> * get_static_objs() const;
 };
 
 

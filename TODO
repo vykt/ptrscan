@@ -1,16 +1,15 @@
 REFACTOR TODO:
 
 args        : done
-debug       : 
-main        :
+debug       : done
+main        : done
 mem_tree    : done
 mem         : done
-serialise   :
+serialise   : done
 thread      : done
 thread_ctrl : done
-ui_base     :
-ui_term     :
-verify      :
+ui_base     : done
+ui_term     : done
 
 
 

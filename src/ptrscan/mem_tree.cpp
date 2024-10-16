@@ -75,6 +75,11 @@ inline const mem_node * mem_node::add_child(const mem_node * child) {
 }
 
 
+inline const int mem_node::get_id() const {
+    return this->id;
+}
+
+
 inline const int mem_node::get_rw_areas_index() const {
     return this->rw_areas_index;
 }

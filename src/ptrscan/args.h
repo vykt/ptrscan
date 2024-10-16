@@ -71,13 +71,13 @@ typedef struct {
     
     std::vector<region> extra_static_areas;  //user supplied vmas to treat as static
     std::vector<region> exclusive_rw_areas;  //user supplied vmas to exclusively scan
-    std::vector<uintptr_t> preset_offsets;     //first n offsets (if supplied)
+    std::vector<uint32_t> preset_offsets;     //first n offsets (if supplied)
 
     //internal
     std::string target_comm;
 
 } args_struct;
 
-int process_args(const int argc, const char ** argv, args_struct * args);
+int process_args(int argc, char ** argv, args_struct * args);
 
 #endif

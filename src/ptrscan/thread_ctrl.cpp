@@ -234,7 +234,8 @@ thread_ctrl::thread_ctrl(const args_struct * args, const mem * m,
 
 
 //setup threads for next iteration
-void thread_ctrl::prepare_threads(args_struct * args, mem * m, mem_tree * m_tree) {
+void thread_ctrl::prepare_threads(const args_struct * args, 
+                                  mem * m, mem_tree * m_tree) {
 
     const char * exception_str[1] = {
         "thread_ctrl -> prepare_level: ln_get_area_offset returned -1. Impossible?"
@@ -339,7 +340,7 @@ void thread_ctrl::end_level() {
 
 
 //wait for all threads to terminate
-thread_ctrl::~thread_ctrl() {
+void thread_ctrl::join_threads() {
 
     const char * exception_str[2] {
         "thread_ctrl -> wait_thread_terminate: pthread_join() failed to join.",
@@ -361,4 +362,9 @@ thread_ctrl::~thread_ctrl() {
     } //end for
 
     return;
+}
+
+
+const std::vector<thread> * thread_ctrl::get_threads() const {
+    return &this->threads;
 }

@@ -22,7 +22,7 @@ static inline void _record_value(cm_byte * value,
                                  size_t size, size_t nmemb, FILE * fs) {
 
     const char * exception_str[1] = {
-        "serialise -> record_value: fwrite() request failed."
+        "serialiser -> record_value: fwrite() request failed."
     };
 
     size_t write_last;
@@ -41,7 +41,7 @@ static inline void _read_value(cm_byte * value,
                                size_t size, size_t nmemb, FILE * fs) {
 
     const char * exception_str[1] = {
-        "serialise -> record_value: fread() request failed."
+        "serialiser -> record_value: fread() request failed."
     };
 
     size_t read_last;
@@ -59,8 +59,8 @@ static inline void _read_value(cm_byte * value,
 static inline char _read_char(FILE * fs, bool expect_EOF) {
 
     const char * exception_str[2] = {
-        "serialise -> read_region_definitions: error reading .pscan file.",
-        "serialise -> read_region_definitions: unexpected end of .pscan file."
+        "serialiser -> read_region_definitions: error reading .pscan file.",
+        "serialiser -> read_region_definitions: unexpected end of .pscan file."
     };
 
     int ret;
@@ -182,7 +182,7 @@ void serialiser::record_region_definitions(const mem * m, FILE * fs) {
 void serialiser::read_region_definitions(const mem * m, FILE * fs) {
 
     const char * exception_str[1] = {
-        "serialise -> read_region_definitions: ungetc() failed."
+        "serialiser -> read_region_definitions: ungetc() failed."
     }; 
 
     int ret;
@@ -258,11 +258,11 @@ void serialiser::record_offsets(const mem * m, FILE * fs) {
                       sizeof(s_entry->static_objs_index), 1, fs);
 
         //for every offset
-        for (int j = 0; j < s_entry->offset_vector.size(); ++j) {
+        for (int j = 0; j < s_entry->offsets.size(); ++j) {
 
             //record offset 
-            _record_value((cm_byte *) &s_entry->offset_vector[j], 
-                          sizeof(s_entry->offset_vector[j]), 1, fs);
+            _record_value((cm_byte *) &s_entry->offsets[j], 
+                          sizeof(s_entry->offsets[j]), 1, fs);
         
         } //end for every offset
 
@@ -305,7 +305,7 @@ void serialiser::read_offsets(const mem *, FILE * fs) {
         while (delim_offset != DELIM_OFFSET) {
             
             //push offset
-            s_entry.offset_vector.push_back(delim_offset);
+            s_entry.offsets.push_back(delim_offset);
 
             //get next offset/delimiter
             _read_value((cm_byte *) &delim_offset, sizeof(delim_offset), 1, fs);
@@ -326,7 +326,7 @@ void serialiser::recurse_offset(const mem_node * m_node,
 
     //calculate this offset
     uint32_t offset = (uint32_t) (m_node->get_addr() - last_ptr);
-    s_entry->offset_vector.push_back(offset);
+    s_entry->offsets.push_back(offset);
 
     const mem_node * parent = m_node->get_parent();
 
@@ -386,7 +386,7 @@ void serialiser::recurse_down(const args_struct * args, const mem * m,
         offset = (uint32_t) ln_get_obj_offset(vma->obj_node_ptr, m_node->get_addr());
 
         //add the offset
-        s_entry.offset_vector.push_back(offset);
+        s_entry.offsets.push_back(offset);
 
         //recursively traverse to root, adding offsets in the process
         this->recurse_offset(m_node->get_parent(), 
@@ -412,7 +412,197 @@ void serialiser::recurse_down(const args_struct * args, const mem * m,
 }
 
 
+//verify an individual pointer chain
+bool serialiser::verify_chain(const args_struct * args, 
+                              const mem * m, const serial_entry * s_entry) {
+
+    int ret;
+    uintptr_t addr;
+
+    cm_list_node * obj_node;
+    ln_vm_obj * obj;
+
+    //get start address
+    obj_node = this->rw_objs[s_entry->rw_objs_index];
+    obj = LN_GET_NODE_OBJ(obj_node);
+    addr = obj->start_addr;
+    
+    //for each offset
+    for (int i = 0; i < s_entry->offsets.size(); ++i) {
+
+        //add offset to address
+        addr += s_entry->offsets[i];
+        
+        //read new address
+        ret = ln_read(m->get_session(), addr, (cm_byte *) &addr, sizeof(addr));
+        if (ret) {
+            return false;
+        }
+
+    } //end for each offset
+
+    if (addr == args->target_addr) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+
+void serialiser::remove_invalid_objs(const int start_rw_index,
+                                     const int start_static_index) {
+
+    serial_entry * s_entry;
+    
+    bool correct_rw = false;
+    bool correct_static = false;
+
+
+    //since rw-/rwx is a superset of static, return if it is -1
+    if (start_rw_index != -1) {
+
+        //remove invalid rw-/rwx object
+        this->rw_objs.erase(this->rw_objs.begin() + start_rw_index);
+        correct_rw = true;
+    }
+
+    //remove invalid static object if necessary
+    if (start_static_index != -1) {
+
+        //remove invalid static object
+        this->static_objs.erase(this->static_objs.begin() + start_static_index);
+        correct_static = true;
+    }
+
+
+    //for every pointer chain
+    for (int i = 0; i < this->ptrchains.size(); ++i) {
+
+        //fetch pointer chain
+        s_entry = &this->ptrchains[i];
+        
+        //if its rw-/rwx index was affected by the removal of the invalid object, 
+        //then correct it
+        if (correct_rw && s_entry->rw_objs_index > start_rw_index) {
+            s_entry->rw_objs_index -= 1;
+        }
+
+        //if its static index was affected by the removal of the invalid object,
+        //then correct it
+        if (correct_static && s_entry->static_objs_index > start_static_index) {
+            s_entry->static_objs_index -= 1;
+        }
+
+    } //end for every pointer chain
+
+    return;
+}
+
+
+//clean up intermediate state by removing invalid backing objects
+void serialiser::cleanup_intermediate() {
+
+    serial_entry * s_entry;
+    cm_list_node * obj_node_rw, * obj_node_static;
+
+    int start_rw_index     = -1;
+    int start_static_index = -1;
+
+    //for every pointer chain
+    for (int i = 0; i < this->ptrchains.size(); ++i) {
+
+        s_entry  = &this->ptrchains[i];
+        obj_node_rw = this->rw_objs[s_entry->rw_objs_index];
+        if (s_entry->static_objs_index != -1) {
+            obj_node_static = this->rw_objs[s_entry->static_objs_index];
+        }
+
+        //if backing rw object was not found
+        if (obj_node_rw == nullptr) {
+            start_rw_index = s_entry->rw_objs_index;
+        }
+
+        //if backing static object was not found
+        if (obj_node_static == nullptr) {
+            start_static_index = s_entry->static_objs_index;
+        }
+
+        //cleanup
+        remove_invalid_objs(start_rw_index, start_static_index);
+
+    } //end for every pointer chain
+
+    return;
+}
+
+
 // --- PUBLIC METHODS
+
+//write ptrchains to output .pscan file
+void serialiser::record_pscan(const args_struct * args, const mem * m) {
+
+    const char * exception_str[1] = {
+        "serialiser -> record_pscan: could not open output .pscan file for writing."
+    }; 
+    
+    FILE * fs;
+    
+
+    //open output file
+    fs = fopen(args->output_file.c_str(), "w");
+    if (fs == nullptr) {
+        throw std::runtime_error(exception_str[0]);
+    }
+
+    //record metadata (bitwidth)
+    record_metadata(fs);
+
+    //record region definitions
+    record_region_definitions(m, fs);
+
+    //record offsets
+    record_offsets(m, fs);
+
+
+    //close output file
+    fclose(fs);
+
+    return;
+}
+
+
+//read ptrchains from input .pscan file
+void serialiser::read_pscan(const args_struct * args, const mem * m) {
+
+    const char * exception_str[1] = {
+        "serialiser -> record_pscan: could not open input .pscan file for reading."
+    }; 
+    
+    FILE * fs;
+    
+
+    //open input file
+    fs = fopen(args->input_file.c_str(), "r");
+    if (fs == nullptr) {
+        throw std::runtime_error(exception_str[0]);
+    }
+
+    //read metadata (bitwidth)
+    read_metadata(fs);
+
+    //read region defintions
+    read_region_definitions(m, fs);
+
+    //read offsets
+    read_offsets(m, fs);
+
+
+    //close input file
+    fclose(fs);
+
+    return;
+}
+
 
 //convert mem_tree to a serialised format that can be stored and printed.
 void serialiser::serialise_tree(const args_struct * args, 
@@ -448,67 +638,59 @@ void serialiser::serialise_tree(const args_struct * args,
 }
 
 
-//write ptrchains to output .pscan file
-void serialiser::record_pscan(const args_struct * args, const mem * m) {
+//verify the intermediate representation by attempting to follow each chain
+void serialiser::verify(const args_struct * args, const mem * m) {
 
-    const char * exception_str[1] = {
-        "serialise -> record_pscan: could not open output .pscan file for writing."
-    }; 
-    
-    FILE * fs;
-    
+    bool valid;
 
-    //open output file
-    fs = fopen(args->output_file.c_str(), "w");
-    if (fs == nullptr) {
-        throw std::runtime_error(exception_str[0]);
-    }
+    serial_entry * s_entry;
 
-    //record metadata (bitwidth)
-    record_metadata(fs);
-
-    //record region definitions
-    record_region_definitions(m, fs);
-
-    //record offsets
-    record_offsets(m, fs);
+    cm_list_node * obj_node;
+    ln_vm_obj * obj;
 
 
-    //close output file
-    fclose(fs);
+    //for each pointer chain, verify the chain
+    for (int i = 0; i < this->ptrchains.size(); ++i) {
+
+        s_entry  = &this->ptrchains[i];
+        obj_node = this->rw_objs[s_entry->rw_objs_index];
+
+        //if backing object for this chain could not be found
+        if (obj_node == nullptr) {
+            this->ptrchains.erase(this->ptrchains.begin() + i);
+            --i;
+        }
+
+        obj = LN_GET_NODE_OBJ(obj_node);
+
+        //if chain arrives at the wrong address
+        valid = verify_chain(args, m, s_entry);
+        if (!valid) {
+            this->ptrchains.erase(this->ptrchains.begin() + i);
+            --i;
+        }
+
+    } //end for each pointer chain
+
+    //clean up invalid backing objects
+    cleanup_intermediate();
 
     return;
 }
 
 
-//read ptrchains from input .pscan file
-void serialiser::read_pscan(const args_struct * args, const mem * m) {
+cm_byte serialiser::get_bit_width() const {
+    return this->bit_width;
+}
 
-    const char * exception_str[1] = {
-        "serialise -> record_pscan: could not open input .pscan file for reading."
-    }; 
-    
-    FILE * fs;
-    
+const std::vector<serial_entry> * serialiser::get_ptrchains() const {    
+    return &this->ptrchains;
+}
 
-    //open input file
-    fs = fopen(args->input_file.c_str(), "r");
-    if (fs == nullptr) {
-        throw std::runtime_error(exception_str[0]);
-    }
+const std::vector<cm_list_node *> * serialiser::get_rw_objs() const {
+    return &this->rw_objs;
+}
 
-    //read metadata (bitwidth)
-    read_metadata(fs);
-
-    //read region defintions
-    read_region_definitions(m, fs);
-
-    //read offsets
-    read_offsets(m, fs);
-
-
-    //close input file
-    fclose(fs);
-
-    return;
+const std::vector<cm_list_node *> * serialiser::get_static_objs() const {
+    return &this->static_objs;
 }

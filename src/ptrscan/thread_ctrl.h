@@ -36,11 +36,15 @@ class thread_ctrl {
         //methods
         thread_ctrl(const args_struct * args, const mem * m, 
                     const mem_tree * m_tree, ui_base * ui); 
-        ~thread_ctrl();
         
-        void prepare_threads(args_struct * args, mem * m, mem_tree * m_tree);
+        void prepare_threads(const args_struct * args, 
+                             mem * m, mem_tree * m_tree);
         void start_level();
         void end_level();
+        void join_threads();
+
+        //getters & setters
+        const std::vector<thread> * get_threads() const;
 };
 
 

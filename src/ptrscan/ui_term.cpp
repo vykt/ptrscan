@@ -1,7 +1,6 @@
 #include <iostream>
 #include <string>
 #include <sstream>
-#include <stdexcept>
 
 #include <cstdlib>
 #include <cstring>
@@ -13,96 +12,50 @@
 #include <liblain.h>
 
 #include "ui_term.h"
-#include "ui_base.h"
 #include "args.h"
-#include "serialise.h"
-#include "proc_mem.h"
+#include "mem.h"
+#include "serialiser.h"
 
-
-
-//get maps_obj by name
-inline void fill_serial_to_obj(serialise * ser, proc_mem * p_mem) {
-
-    const char * exception_str[2] = {
-        "serial_to_obj: static or rw indeces failed to produce an object",
-        "serial_to_obj: static and rw indeces unset."
-    };
-
-
-    int ret;
-    serial_entry * temp_s_entry;
-
-    
-    //for every pointer chain
-    for (unsigned int i = 0; i < ser->ptrchains_vector.size(); ++i) {
-
-        //get pointer for next serial_entry
-        temp_s_entry = &ser->ptrchains_vector[i];
-
-        /*
-         *  Priority given to matching by static region because it is more reliable
-         */
-
-        //match region using static_region_index
-        if (temp_s_entry->static_regions_index != -1) {
-
-            //get parent object of matching static region
-            ret = match_maps_obj(
-                    ser->static_region_str_vector[
-                    temp_s_entry->static_regions_index],
-                    p_mem,
-                    &temp_s_entry->matched_m_obj);
-            if (ret == -1) {
-                throw std::runtime_error(exception_str[0]);
-            }
-
-        //otherwise fallback to using rw_region_index 
-        } else if (temp_s_entry->rw_regions_index != -1) {
-
-            //unset color
-            std::cout << RESET;
-            
-            //get parent object of matching static region
-            ret = match_maps_obj(
-                    ser->rw_region_str_vector[
-                    temp_s_entry->rw_regions_index],
-                    p_mem,
-                    &temp_s_entry->matched_m_obj);
-            if (ret == -1) {
-                throw std::runtime_error(exception_str[0]);
-            }
-
-        //this should never happen
-        } else {
-            throw std::runtime_error(exception_str[1]);
-        
-        } //end if-else-then
-
-    } //end for every ptrchain
-}
 
 
 //get longest basename
-inline void get_column_sizes(serialise * ser, proc_mem * p_mem, 
-                            std::vector<int> * column_sizes) {
+static inline void _get_column_sizes(const serialiser * s, const mem * m, 
+                                     std::vector<int> * column_sizes) {
 
-    int max, now, len, column_index;
-    uint32_t unow;
+    int max;
+    int column_index;
+    int offset_len;
+    int current_basename_len;
+    uint32_t current_offset;
 
     max = -1;
     column_index = 0;
 
+    serial_entry * s_entry;
+    cm_list_node * obj_node;
+    ln_vm_obj * obj;
 
-    //first, get basename width
-    for (unsigned int i = 0; i < (unsigned int) ser->ptrchains_vector.size(); ++i) {
+    const std::vector<serial_entry> * ptrchains = s->get_ptrchains();
+    const std::vector<cm_list_node *> * rw_objs = s->get_rw_objs();
+    const std::vector<cm_list_node *> * static_objs = s->get_static_objs();
+
+
+    //for every pointer chain
+    for (int i = 0; i < ptrchains->size(); ++i) {
+
+        //get object
+        s_entry = (serial_entry *) &(*ptrchains)[i];
+        obj_node = (*rw_objs)[s_entry->rw_objs_index];
+        obj = LN_GET_NODE_OBJ(obj_node);
 
         //get length of basename
-        now = strlen(ser->ptrchains_vector[i].matched_m_obj->basename);
+        current_basename_len = strlen(obj->basename);
 
         //update max as required
-        if (max < now) max = now;
+        if (max < current_basename_len) max = current_basename_len;
     }
 
+    //push first column size
     column_sizes->push_back(max);
 
 
@@ -112,23 +65,22 @@ inline void get_column_sizes(serialise * ser, proc_mem * p_mem,
         max = -1;
 
         //for every serial entry
-        for (unsigned int i = 0; i < (unsigned int) ser->ptrchains_vector.size(); ++i) {
+        for (int i = 0; i < ptrchains->size(); ++i) {
 
             //get offset of next serial entry at given column
-            if (ser->ptrchains_vector[i].offset_vector->size()
-                <= (unsigned int) column_index) continue;
+            if ((*ptrchains)[i].offsets.size() <= column_index) continue;
             
-            unow = (*ser->ptrchains_vector[i].offset_vector)[column_index];
+            current_offset = (*ptrchains)[i].offsets[column_index];
             
             //get length through division
-            len = 0;
-            while (unow != 0) {
-                unow /= 0x10;
-                len += 1;
+            offset_len = 0;
+            while (current_offset != 0) {
+                current_offset /= 0x10;
+                offset_len += 1;
             }
 
             //update max as required
-            if (max < len) max = len;
+            if (max < offset_len) max = offset_len;
 
         } //end for
 
@@ -150,73 +102,26 @@ inline void ui_term::report_exception(const std::exception& e) {
 
 
 //report when a level is finished
-inline void ui_term::report_control_progress(int level_done) {
+inline void ui_term::report_depth_progress(const int depth_done) {
     
-    std::cout << RED << "[ctrl]: level " << level_done << " finished.\n" << RESET;
+    std::cout << RED << "[ctrl]: level " << depth_done << " finished.\n" << RESET;
     return;
 }
 
 
 //acquire mutex & report thread progress
-inline void ui_term::report_thread_progress(unsigned int region_done, 
-                                            unsigned int region_total,
-                                            int human_thread_id) {
+inline void ui_term::report_thread_progress(const unsigned int vma_done, 
+                                            const unsigned int vma_total,
+                                            const int human_thread_id) {
 
     //to avoid using mutexes here, compose the string & call std::cout once
     std::stringstream report;
-    report << "[thread " << human_thread_id << "] " << region_done << " out of "
-           << region_total << " finished.\n";
+    report << "[thread " << human_thread_id << "] " << vma_done << " out of "
+           << vma_total << " finished.\n";
     std::cout << report.str();
 
     return;
 }
-
-
-//get user to pick one PID from multiple matches
-pid_t ui_term::clarify_pid(name_pid * n_pid) {
-
-    const char * exception_str[1] = {
-        "ui_term -> clarify_pid: vector range error."
-    };
-
-    int ret;
-    std::string input;
-    pid_t selection;
-    pid_t * temp_pid;
-    std::string buf;
-
-
-    std::cout << "please provide a PID matching the target name (/proc/<pid>/comm):" << std::endl;
-
-    //for every match
-    for (unsigned int i = 0; i < n_pid->pid_vector.length; ++i) {
-        
-        ret = vector_get_ref(&n_pid->pid_vector, (unsigned long) i,
-                             (byte **) &temp_pid);
-        if (ret == -1) {
-            throw std::runtime_error(exception_str[0]);
-        }
-
-        std::cout << i << ": " << *temp_pid << std::endl;
-    }
-
-    //ask until correct input is provided (they'll just type the PID i know it)
-    while (1) {
-
-        input.clear();
-        std::getline(std::cin, input);
-        try {
-            std::cout << "> ";
-            selection = std::stoi(input);
-						break;
-        } catch (std::exception& e) {
-            std::cout << std::endl << "invalid selection provided";
-        }
-    } //end while
-
-    return selection;
-}
-
 
 
 /*
@@ -224,12 +129,14 @@ pid_t ui_term::clarify_pid(name_pid * n_pid) {
  */
 
 //print out results
-void ui_term::output_serialised_results(void * args_ptr, void * serialise_ptr,
-                                        void * proc_mem_ptr) {
+void ui_term::output_ptrchains(const void * args_ptr, 
+                               const void * s_ptr, const void * m_ptr) {
 
     int len;
 
-    serial_entry * temp_s_entry;
+    serial_entry * s_entry;
+    cm_list_node * obj_node;
+    ln_vm_obj * obj;
 
     std::string print_buf;
     std::stringstream convert_buf;
@@ -237,49 +144,56 @@ void ui_term::output_serialised_results(void * args_ptr, void * serialise_ptr,
     std::vector<int> column_sizes;
 
     //typecast arg
-    args_struct * real_args = (args_struct *) args_ptr;
-    serialise * real_serialise = (serialise *) serialise_ptr;
-    proc_mem * real_p_mem = (proc_mem *) proc_mem_ptr;
+    args_struct * args = (args_struct *) args_ptr;
+    serialiser * s = (serialiser *) s_ptr;
+    mem * m = (mem *) m_ptr;
 
-    //find corresponding maps_obj for each serial entry
-    fill_serial_to_obj(real_serialise, real_p_mem);
+    //get serialiser vectors
+    const std::vector<serial_entry> * ptrchains = s->get_ptrchains();
+    const std::vector<cm_list_node *> * rw_objs = s->get_rw_objs();
+    const std::vector<cm_list_node *> * static_objs = s->get_static_objs();
+
 
     //get column widths
-    get_column_sizes(real_serialise, real_p_mem, &column_sizes);
+    _get_column_sizes(s, m, &column_sizes);
 
 
     //output header
-    std::cout << "\nptrscan for: " << real_args->target_str 
-              << " | target addr: 0x" << std::hex << real_args->target_addr
+    std::cout << "\nptrscan for: " << args->target_str 
+              << " | target addr: 0x" << std::hex << args->target_addr
               << "\n\n";
 
     //for every pointer chain
-    for (unsigned int i = 0; i < real_serialise->ptrchains_vector.size(); ++i) {
+    for (unsigned int i = 0; i < ptrchains->size(); ++i) {
 
         //get pointer for next serial_entry
-        temp_s_entry = &real_serialise->ptrchains_vector[i];
+        s_entry = (serial_entry *) &(*ptrchains)[i];
 
         //setup buffer
         print_buf.clear();
 
         //set color
-        if (temp_s_entry->static_regions_index != -1) {
+        if (s_entry->static_objs_index != -1) {
             print_buf.append(GREEN);
         }
 
+        //get object of pointer chain
+        obj_node = (*rw_objs)[s_entry->rw_objs_index];
+        obj = LN_GET_NODE_OBJ(obj_node);
+
         //format basename
-        len = column_sizes[0] - strlen(temp_s_entry->matched_m_obj->basename);
+        len = column_sizes[0] - strlen(obj->basename);
         print_buf.append(len, ' ');
-        print_buf.append(temp_s_entry->matched_m_obj->basename);
+        print_buf.append(obj->basename);
         print_buf.append(" + ");
 
         //format remaining offsets
-        for (unsigned int j = 0; j < temp_s_entry->offset_vector->size(); ++j) {
+        for (int j = 0; j < s_entry->offsets.size(); ++j) {
 
             //format offsets
             convert_buf.str(std::string());
             convert_buf.clear();
-            convert_buf << "0x" << std::hex << (*temp_s_entry->offset_vector)[j];
+            convert_buf << "0x" << std::hex << s_entry->offsets[j];
             print_buf.append(convert_buf.str());
             if ((column_sizes[j+1] - (convert_buf.str().length() - 2)) != 0) {
                 print_buf.append(column_sizes[j+1]
@@ -290,7 +204,7 @@ void ui_term::output_serialised_results(void * args_ptr, void * serialise_ptr,
         } //end inner for
 
         //unset color
-        if (temp_s_entry->static_regions_index != -1) {
+        if (s_entry->static_objs_index != -1) {
             print_buf.append(RESET);
         }
 
@@ -301,11 +215,11 @@ void ui_term::output_serialised_results(void * args_ptr, void * serialise_ptr,
     } //end for
    
     //output footer
-    std::cout << "\nfound " << std::dec << real_serialise->ptrchains_vector.size() 
+    std::cout << "\nfound " << std::dec << ptrchains->size() 
               << " chains | aligned: "
               //this is 'magic' to convert bool into alignment of scan in bytes
-              << (((int) real_args->aligned) * (sizeof(uintptr_t) - 1) + 1)
-              << " | lookback: 0x" << std::hex << real_args->ptr_lookback 
-              << " | levels: " << std::dec << real_args->levels 
+              << (((int) args->aligned) * (sizeof(uintptr_t) - 1) + 1)
+              << " | lookback: 0x" << std::hex << args->max_struct_size 
+              << " | levels: " << std::dec << args->max_struct_size 
               << std::endl;
 }
