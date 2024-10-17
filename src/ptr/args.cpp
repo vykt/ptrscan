@@ -21,9 +21,9 @@ static inline void _set_default_args(args_struct * args) {
 
     args->colour  = false;
     args->verbose = false;
-    args->aligned = true;
     args->use_preset_offsets = false;
 
+    args->alignment   = 4;
     args->bit_width   = 64;
     args->target_addr = 0;
 
@@ -167,6 +167,7 @@ static void _process_regions(std::vector<region> * region_vector,
 int process_args(int argc, char ** argv, args_struct * args) {
 
     const char * exception_str[] = {
+        "process_args: useL -A <size:uint8_t> --alignment=<size:uint8_t>",
         "process_args: use: -b <size:uint8_t> --bit-width=<size:uint8_t>",
         "process_args: use: -a <addr:uintptr_t> --target-addr=<addr:uintptr_t>",
         "process_args: use: -s <size:size_t> --max-struct-size=<size:size_t>",
@@ -190,8 +191,7 @@ int process_args(int argc, char ** argv, args_struct * args) {
         {"colour", no_argument, nullptr, 'c'},
         {"no-colour", no_argument, nullptr, 'n'},
         {"verbose", no_argument, nullptr, 'v'},
-        {"aligned", no_argument, nullptr, 'A'},
-        {"unaligned", no_argument, nullptr, 'U'},
+        {"alignment", required_argument, nullptr, 'A'},
         {"bit-width", required_argument, nullptr, 'b'},
         {"target-addr", required_argument, nullptr, 'a'},
         {"max-struct-size", required_argument, nullptr, 's'},
@@ -215,7 +215,7 @@ int process_args(int argc, char ** argv, args_struct * args) {
     
 
     //iterate over supplied flags
-    while(((opt = getopt_long(argc, argv,"w:r:TNpkcnvaub:p:s:d:t:S:R:O:x", 
+    while(((opt = getopt_long(argc, argv,"w:r:TNpkcnvA:b:p:s:d:t:S:R:O:x", 
            long_opts, &opt_index)) != -1) && (opt != 0)) {
 
         //determine parsed argument
@@ -267,50 +267,47 @@ int process_args(int argc, char ** argv, args_struct * args) {
                 break;
 
             case 'A': //aligned pointer scan
-                args->aligned = SCAN_ALIGNED;
-                break;
-
-            case 'U': //unaligned pointer scan
-                args->aligned = SCAN_UNALIGNED;
+                args->alignment = (cm_byte) _process_int_argument(optarg,
+                                                                  exception_str[0]);
                 break;
 
             case 'b': //bit width
                 args->bit_width = (cm_byte) _process_int_argument(optarg, 
-                                                                  exception_str[0]);
+                                                                  exception_str[1]);
                 break;
 
             case 'a': //target address
                 args->target_addr = (uintptr_t) 
-                                    _process_int_argument(optarg, exception_str[1]);  
+                                    _process_int_argument(optarg, exception_str[2]);  
                 break;
 
             case 's': //max struct size
                 args->max_struct_size = 
-                    (size_t) _process_int_argument(optarg, exception_str[2]);
+                    (size_t) _process_int_argument(optarg, exception_str[3]);
                 break;
             
             case 'd': //max depth
                 args->max_depth = (unsigned int) 
-                    _process_int_argument(optarg, exception_str[3]);
+                    _process_int_argument(optarg, exception_str[4]);
                 break;
             
             case 't': //number of threads
                 args->threads = 
-                    (unsigned int) _process_int_argument(optarg, exception_str[4]);
+                    (unsigned int) _process_int_argument(optarg, exception_str[5]);
                 break;
 
             case 'S': //extra memory regions to treat as static
                 _process_regions(&args->extra_static_areas, 
-                                 optarg, exception_str[5]);
+                                 optarg, exception_str[6]);
                 break;
 
             case 'R': //exhaustive list of rw- regions to scan
                 _process_regions(&args->exclusive_rw_areas, 
-                                 optarg, exception_str[6]);
+                                 optarg, exception_str[7]);
                 break;
 
             case 'O': //specify preset offsets
-                _process_offsets(args, optarg, exception_str[7]);
+                _process_offsets(args, optarg, exception_str[8]);
                 args->use_preset_offsets = true;
                 break;
 
@@ -333,13 +330,13 @@ int process_args(int argc, char ** argv, args_struct * args) {
 
         //for every remaining level without a preset offset
         for (unsigned int i = args->preset_offsets.size(); i < args->max_depth; ++i) {
-            args->preset_offsets.insert(args->preset_offsets.end(), (uintptr_t) -1);
+            args->preset_offsets.insert(args->preset_offsets.end(), -1);
         }
     }
 
     //assign target string and check for null
     if (argv[optind] == 0) {
-        throw std::runtime_error(exception_str[8]);
+        throw std::runtime_error(exception_str[9]);
     }
     args->target_str.assign(argv[optind]);
 
@@ -349,6 +346,6 @@ int process_args(int argc, char ** argv, args_struct * args) {
     } //end for
     
     //otherwise, throw an exception
-    throw std::runtime_error(exception_str[8]);
+    throw std::runtime_error(exception_str[10]);
     return -1;
 }

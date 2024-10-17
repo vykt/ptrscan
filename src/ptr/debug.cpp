@@ -170,11 +170,11 @@ static inline void _dump_args_struct(std::string prefix, const args_struct * arg
 
     std::cerr << prefix << TAB << "colour:             " << args->colour << NL;
     std::cerr << prefix << TAB << "verbose:            " << args->verbose << NL;
-    std::cerr << prefix << TAB << "aligned:            " << args->aligned << NL;
     std::cerr << prefix << TAB << "use_preset_offsets: " << args->use_preset_offsets 
-        << NL;
+                                                         << NL;
     std::cerr << prefix << NL;
 
+    std::cerr << prefix << TAB << "alignment:          " << args->alignment << NL;
     std::cerr << prefix << TAB << "bit_width:          " << args->bit_width << NL;
     std::cerr << prefix << TAB << "target_addr:        " << std::hex 
                                                          << args->target_addr 

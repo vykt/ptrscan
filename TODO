@@ -1,26 +1,5 @@
-REFACTOR TODO:
+-Implement a handler for CTRL+C during scanning which will terminate the scan and save the results acquired so far.
 
-args        : done
-debug       : done
-main        : done
-mem_tree    : done
-mem         : done
-serialise   : done
-thread      : done
-thread_ctrl : done
-ui_base     : done
-ui_term     : done
+-Differentiate between different objects with same pathname/basename.
 
-
-
-TO FIX:
-
-1) use hashmaps(?) to correctly handle backing objects with duplicate names
-
-
-TO ADD:
-
-
-2) export .pscan files to either .json or .csv for easy integration with scripting 
-   languages
-
+-Add option to export results to .csv instead of .pscan.

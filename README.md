@@ -1,71 +1,66 @@
-<p align="center">
-    <img src="logo.png">
-</p>
-
 # ptrscan
 
 ### ABOUT:
 
-Ptrscan is an implementation of a pointer scanner following the ideas of Cheat Engine's own pointer scanner implementation. Ptrscan was written from scratch to run natively on Linux - no more running CE through wine. 
+Pointer Scanner (**ptrscan**) is a dynamic analysis utility for discovering related pointers within a target process. 
 
-[What is a pointer scanner?](https://guidedhacking.com/threads/cheat-engine-how-to-pointer-scan-with-pointermaps.9739/)
+Because pointers are typically stored as parts of structures, **ptrscan** also discovers structures and their relationships, which at a high level reveals the design of your target.
 
----
+**ptrscan** is able to *verify* previously identified pointer chains by attempting to follow them through different instances of the same program, eliminating false positives.
 
-### DEPENDENES:
+In addition to assisting with dynamic analysis, select pointer chains produced by **ptrscan** can be used to reliably navigate the memory of a target process from an external process.
 
-Ptrscan dynamically links [libpwu](https://github.com/vykt/libpwu). Release 0.1.4 is required. Visit the page and follow installation instructions.
 
----
 
-### INSTALLAON:
+### DEPENDENCIES:
+
+**ptrscan** links the following at runtime:
+
+- [liblain](https://github.com/vykt/liblain)
+- [libcmore](https://github.com/vykt/libcmore)
+
+**ptrscan** can optionally use this LKM to scan through a hidden kernel interface:
+
+- [lain.ko](https://github.com/vykt/lain.ko)
+
+
+
+### INSTALLATON:
 
 Fetch the repo:
 ```
 $ git clone https://github.com/vykt/ptrscan
 ```
 
-Generate build files:
+Build:
 ```
-$ cd ptrscan && ./buildgen.sh
-```
-
-Build the release:
-```
-$ cd build && make scan
+$ cd ptrscan
+$ make ptrscan build=release
 ```
 
-Check the install script & install:
+Install:
 ```
-$ cd .. && sudo ./install.sh
+# make install
 ```
 
----
+Install additional markdown documentation:
+```
+# make install_doc
+```
+
+To uninstall:
+```
+# make uninstall
+```
+
+
+
+### DOCUMENTATION:
+
+After installing **ptrscan**, see `man 1 ptrscan`. Alternatively, markdown documentation is available at `./doc/md/ptrscan.md`. 
+
+
 
 ### EXAMPLES:
 
-Using ptrscan is covered in the ptrscan manpage:
-```
-$ man ptrscan
-```
-
-1) Pointer scan process example\_proc for address 0x55134a90f080 (-a) and save the results to first\_map.pscan (-w):
-```
-ptrscan -a 0x55134a90f080 -w first_map.pscan example_proc
-```
-
-2) Verify the pointer chains (-x) in first\_map.pscan (-r) to check that they arrive at address 0x55431bea1080 (-a). Output the new results to second\_map.pscan (-w).
-```
-ptrscan -x -a 0x55431bea1080 -r first_map.pscan -w second_map.pscan example_proc
-```
-
-3) Using the default terminal interface (-c), carry out an aligned (-q) pointer scan with 0x500 lookback (-p) and the depth of 4 levels (-l). Use 4 threads (-t). Report on the progress of the scan (-v). Output pointer chains to the third\_map.pscan file. Carry out the scan on the example\_proc process.
-```
-ptrscan -c -v -q -p 0x500 -l 4 -t 4 -a 0x7fffba434000 -w third_map.pscan example_proc
-```
-
----
-
-### FUTURE CONSIDERATIONS:
-
-An alternative ncurses interface is planned. For any other feature requests or bugs please open an issue.
+See `./doc/md/ptrscan.md` for a walkthrough of a typical use case.

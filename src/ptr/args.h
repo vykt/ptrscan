@@ -11,9 +11,6 @@
 #define UI_TERM 0
 #define UI_NCURSES 1
 
-#define SCAN_ALIGNED true
-#define SCAN_UNALIGNED false
-
 #define STRTYPE_INT 0
 #define STRTYPE_LONG 1
 #define STRTYPE_LLONG 2
@@ -59,9 +56,9 @@ typedef struct {
 
     bool colour;               //use colour codes in output 
     bool verbose;
-    bool aligned;
     bool use_preset_offsets;   //did user supply first n offsets?
     
+    cm_byte alignment;         //boundary for alignment of pointers
     cm_byte bit_width;         //architecture bit width (32bit/64bit, etc.)
     uintptr_t target_addr;     //root node address
     

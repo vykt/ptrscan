@@ -161,11 +161,7 @@ void thread::thread_main(const args_struct * args, const mem * m,
 
 
     //set buffer_increment to aligned (sizeof(uintptr_t)) or unaligned (1)
-    if (args->aligned) {
-        buffer_increment = args->bit_width;
-    } else {
-        buffer_increment = 1;
-    }
+    buffer_increment = args->alignment;
 
 
     //for every level in the tree (start at 1, 0 is root)
