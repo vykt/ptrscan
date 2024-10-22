@@ -24,7 +24,7 @@ static inline void _set_default_args(args_struct * args) {
     args->use_preset_offsets = false;
 
     args->alignment   = 4;
-    args->bit_width   = 64;
+    args->byte_width  = 8;
     args->target_addr = 0;
 
     args->max_struct_size = 0x400;
@@ -168,7 +168,7 @@ int process_args(int argc, char ** argv, args_struct * args) {
 
     const char * exception_str[] = {
         "process_args: useL -A <size:uint8_t> --alignment=<size:uint8_t>",
-        "process_args: use: -b <size:uint8_t> --bit-width=<size:uint8_t>",
+        "process_args: use: -b <size:uint8_t> --byte-width=<size:uint8_t>",
         "process_args: use: -a <addr:uintptr_t> --target-addr=<addr:uintptr_t>",
         "process_args: use: -s <size:size_t> --max-struct-size=<size:size_t>",
         "process_args: use: -d <depth:uint> --max-depth=<depth:uint>",
@@ -192,7 +192,7 @@ int process_args(int argc, char ** argv, args_struct * args) {
         {"no-colour", no_argument, nullptr, 'n'},
         {"verbose", no_argument, nullptr, 'v'},
         {"alignment", required_argument, nullptr, 'A'},
-        {"bit-width", required_argument, nullptr, 'b'},
+        {"byte-width", required_argument, nullptr, 'b'},
         {"target-addr", required_argument, nullptr, 'a'},
         {"max-struct-size", required_argument, nullptr, 's'},
         {"max-depth", required_argument, nullptr, 'd'},
@@ -215,7 +215,7 @@ int process_args(int argc, char ** argv, args_struct * args) {
     
 
     //iterate over supplied flags
-    while(((opt = getopt_long(argc, argv,"w:r:TNpkcnvA:b:p:s:d:t:S:R:O:x", 
+    while(((opt = getopt_long(argc, argv,"w:r:TNpkcnvA:b:a:s:d:t:S:R:O:x", 
            long_opts, &opt_index)) != -1) && (opt != 0)) {
 
         //determine parsed argument
@@ -271,8 +271,8 @@ int process_args(int argc, char ** argv, args_struct * args) {
                                                                   exception_str[0]);
                 break;
 
-            case 'b': //bit width
-                args->bit_width = (cm_byte) _process_int_argument(optarg, 
+            case 'b': //byte width
+                args->byte_width = (cm_byte) _process_int_argument(optarg, 
                                                                   exception_str[1]);
                 break;
 

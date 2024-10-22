@@ -2,8 +2,8 @@
 
 # This makefile takes the following variables:
 #
-#	CC        - Compiler.
-#	CFLAGS    - Compiler flags.
+#	CXX       - C++ compiler.
+#	CXXFLAGS  - C++ compiler flags.
 #   INCLUDE   - Shared objects to link.
 #   BUILD_DIR - Base build directory.
 
@@ -16,7 +16,7 @@ PTR=ptrscan
 
 WARN_OPTS :=
 
-ptrscan: ${PTR}
+ptr: ${PTR}
 > mkdir -p ${BUILD_DIR}/ptr
 > mv ${PTR} ${BUILD_DIR}/ptr
 
@@ -29,7 +29,7 @@ ${OBJECTS_PTR}: ${SOURCES_PTR} ${HEADERS_PTR}
 clean_all: clean_src clean_build
 
 clean_src:
-> -rm -f *.o
+> rm -f *.o
 
 clean_build:
-> -rm ${BUILD_DIR}/ptr/${PTR}
+> rm ${BUILD_DIR}/ptr/${PTR}

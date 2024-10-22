@@ -15,9 +15,7 @@ static int _next_node_id = 0;
 // --- PRIVATE mem_node METHODS
 
 //check if address is in read & write regions, or if it is in a static region (mode)
-const int mem_node::check_index(const mem * m, const int mode) {
-
-    bool eval;
+const int mem_node::check_index(const mem * m, const uintptr_t addr, const int mode) {
 
     ln_vm_area * vma;
     const std::vector<cm_list_node *> * mode_vector;
@@ -31,12 +29,12 @@ const int mem_node::check_index(const mem * m, const int mode) {
     }
 
     //for every region
-    for (int i = 0; i < mode_vector->size();  ++i) {
+    for (int i = 0; i < (int) mode_vector->size();  ++i) {
 
         vma = LN_GET_NODE_AREA((*mode_vector)[i]);
 
         //check if node_addr falls in range of this static region
-        if ((vma->start_addr <= this->addr) && (vma->end_addr > this->addr)) return i;
+        if ((vma->start_addr <= addr) && (vma->end_addr > addr)) return i;
 
     } //end for
 
@@ -53,8 +51,8 @@ mem_node::mem_node(const uintptr_t addr, const uintptr_t ptr_addr,
     
     //initialiser list
     id(_next_node_id),
-    rw_areas_index(check_index(m, CHECK_RW)),
-    static_areas_index(check_index(m, CHECK_STATIC)),
+    rw_areas_index(check_index(m, addr, CHECK_RW)),
+    static_areas_index(check_index(m, addr, CHECK_STATIC)),
     addr(addr),
     ptr_addr(ptr_addr),
     vma_node(vma_node),
@@ -69,48 +67,48 @@ mem_node::mem_node(const uintptr_t addr, const uintptr_t ptr_addr,
 }
 
 
-inline const mem_node * mem_node::add_child(const mem_node * child) {
+const mem_node * mem_node::add_child(const mem_node * child) {
     this->children.push_front(*child);
     return &this->children.front();
 }
 
 
-inline const int mem_node::get_id() const {
+const int mem_node::get_id() const {
     return this->id;
 }
 
 
-inline const int mem_node::get_rw_areas_index() const {
+const int mem_node::get_rw_areas_index() const {
     return this->rw_areas_index;
 }
 
 
-inline const int mem_node::get_static_areas_index() const {
+const int mem_node::get_static_areas_index() const {
     return this->static_areas_index;
 }
 
 
-inline const uintptr_t mem_node::get_addr() const {
+const uintptr_t mem_node::get_addr() const {
     return this->addr;
 }
 
 
-inline const uintptr_t mem_node::get_ptr_addr() const {
+const uintptr_t mem_node::get_ptr_addr() const {
     return this->ptr_addr;
 }
 
 
-inline const cm_list_node * mem_node::get_vma_node() const {
+const cm_list_node * mem_node::get_vma_node() const {
     return this->vma_node;
 }
 
 
-inline const mem_node * mem_node::get_parent() const {
+const mem_node * mem_node::get_parent() const {
     return this->parent;
 }
 
 
-inline const std::list<mem_node> * mem_node::get_children() const {
+const std::list<mem_node> * mem_node::get_children() const {
     return &this->children;
 }
 
@@ -179,6 +177,10 @@ void mem_tree::add_node(const uintptr_t addr, const uintptr_t ptr_addr,
     std::list<mem_node *> * current_level_list;
     const mem_node * pushed_m_node;
 
+    #ifdef DEBUG
+    ln_vm_area * vma = LN_GET_NODE_AREA(vma_node);
+    ln_vm_area * vma_parent = LN_GET_NODE_AREA(parent->get_vma_node());
+    #endif
 
     //define new node
     mem_node m_node(addr, ptr_addr, vma_node, parent, m);
@@ -208,11 +210,11 @@ void mem_tree::add_node(const uintptr_t addr, const uintptr_t ptr_addr,
 }
 
 
-inline std::list<mem_node *> * mem_tree::get_level_list(int level) const {
+std::list<mem_node *> * mem_tree::get_level_list(int level) const {
     return &(*this->levels)[level];
 }
 
 
-inline const mem_node * mem_tree::get_root_node() const {
+const mem_node * mem_tree::get_root_node() const {
     return this->root_node;
 }

@@ -29,7 +29,7 @@ static inline void _do_scan(const args_struct * args, mem * m,
     #endif
 
     //for every level
-    for (int i = 1; i < args->max_depth; ++i) {
+    for (int i = 1; i < (int) args->max_depth; ++i) {
         
         //prepare the next level
         t_ctrl->prepare_threads(args, m, m_tree);
@@ -51,7 +51,7 @@ static inline void _do_scan(const args_struct * args, mem * m,
     t_ctrl->join_threads();
 
     #ifdef DEBUG
-    dump_mem_tree(m_tree);
+    dump_mem_tree(m_tree, m, args);
     #endif
 
     return;
@@ -59,16 +59,23 @@ static inline void _do_scan(const args_struct * args, mem * m,
 
 
 static inline void _mode_scan(args_struct * args, mem * m,
-                              mem_tree * m_tree, serialiser * s, ui_base * ui) {
+                              serialiser * s, ui_base * ui) {
 
     //populate rw-/rwx & static areas
     m->populate_areas(args);
 
+    //get a new mem_tree
+    mem_tree m_tree(args, m);
+
+    #ifdef DEBUG
+    dump_mem(m);
+    #endif
+
     //carry out scan
-    _do_scan(args, m, m_tree, ui); 
+    _do_scan(args, m, &m_tree, ui); 
     
     //serialise results
-    s->serialise_tree(args, m, m_tree);
+    s->serialise_tree(args, m, &m_tree);
 
     #ifdef DEBUG
     dump_serialiser(s);
@@ -81,17 +88,24 @@ static inline void _mode_scan(args_struct * args, mem * m,
 }
 
 
-static inline void _mode_scan_write(args_struct * args, mem * m,
-                                    mem_tree * m_tree, serialiser * s, ui_base * ui) {
+static inline void _mode_scan_write(args_struct * args, 
+                                    mem * m, serialiser * s, ui_base * ui) {
 
     //populate rw-/rwx & static areas
     m->populate_areas(args);
 
+    //get a new mem_tree
+    mem_tree m_tree(args, m);
+
+    #ifdef DEBUG
+    dump_mem(m);
+    #endif
+
     //carry out scan
-    _do_scan(args, m, m_tree, ui); 
+    _do_scan(args, m, &m_tree, ui); 
     
     //serialise results
-    s->serialise_tree(args, m, m_tree);
+    s->serialise_tree(args, m, &m_tree);
 
     //save results
     s->record_pscan(args, m);
@@ -108,10 +122,14 @@ static inline void _mode_scan_write(args_struct * args, mem * m,
 
 
 static inline void _mode_read(args_struct * args, mem * m,
-                              mem_tree * m_tree, serialiser * s, ui_base * ui) {
+                              serialiser * s, ui_base * ui) {
 
     //read results
     s->read_pscan(args, m);
+
+    #ifdef DEBUG
+    dump_serialiser(s);
+    #endif
 
     //output results
     ui->output_ptrchains(args, s, m);
@@ -121,7 +139,7 @@ static inline void _mode_read(args_struct * args, mem * m,
 
 
 static inline void _mode_verify(args_struct * args, mem * m,
-                                mem_tree * m_tree, serialiser * s, ui_base * ui) {
+                                serialiser * s, ui_base * ui) {
 
     //read results
     s->read_pscan(args, m);
@@ -142,8 +160,7 @@ static inline void _mode_verify(args_struct * args, mem * m,
 
 
 static inline void _mode_verify_write(args_struct * args, mem * m,
-                                      mem_tree * m_tree, serialiser * s, 
-                                      ui_base * ui) {
+                                      serialiser * s, ui_base * ui) {
 
     //read results
     s->read_pscan(args, m);
@@ -174,7 +191,6 @@ int main(int argc, char ** argv) {
     
     //objects
     mem * m;
-    mem_tree * m_tree;
     serialiser * s;
     ui_base * ui;
 
@@ -196,9 +212,6 @@ int main(int argc, char ** argv) {
         //instantiate memory manager
         m = new mem(&args);
 
-        //instantiate memory tree
-        m_tree = new mem_tree(&args, m);
-
         //instantiate a serialiser
         s = new serialiser();
 
@@ -210,7 +223,6 @@ int main(int argc, char ** argv) {
 
     #ifdef DEBUG
     dump_args(&args);
-    dump_mem(m);
     #endif
 
 
@@ -223,32 +235,32 @@ int main(int argc, char ** argv) {
             //scan and output results, do not save to a file
             case MODE_SCAN:
 
-                _mode_scan(&args, m, m_tree, s, ui);
+                _mode_scan(&args, m, s, ui);
                 break;
 
 
             //scan, output results and save to a file
             case MODE_SCAN_WRITE:
 
-                _mode_scan_write(&args, m, m_tree, s, ui);
+                _mode_scan_write(&args, m, s, ui);
                 break;
 
             //do not scan, only print results read from a file
             case MODE_READ:
 
-                _mode_read(&args, m, m_tree, s, ui);
+                _mode_read(&args, m, s, ui);
                 break;
 
             //rescan based on file, print results, do not save to file
             case MODE_VERIFY:
 
-                _mode_verify(&args, m, m_tree, s, ui);
+                _mode_verify(&args, m, s, ui);
                 break;
 
             //rescan based on file, print results, save to a file
             case MODE_VERIFY_WRITE:
 
-                _mode_verify_write(&args, m, m_tree, s, ui);
+                _mode_verify_write(&args, m, s, ui);
                 break;
 
         } //end switch

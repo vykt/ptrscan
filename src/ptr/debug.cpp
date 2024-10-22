@@ -20,12 +20,25 @@
 #define SPACE " "
 
 
+
+static inline void _dump_string_nullable(const char * str) {
+
+    if (str == nullptr) {
+        std::cerr << "<null>" << NL;
+    } else {
+        std::cerr << str << NL;
+    }
+
+    return;
+}
+
+
 static inline void _dump_offsets(std::vector<uint32_t> offsets) {
 
     std::cerr << std::hex;
 
     //for every offset
-    for (int i = 0; i < offsets.size(); ++i) {
+    for (int i = 0; i < (int) offsets.size(); ++i) {
         std::cerr << "+0x" << offsets[i] << SPACE;
     }
 
@@ -136,12 +149,13 @@ static inline void _dump_regions(std::string prefix, std::vector<region> regions
 
     region * r;
 
-    for (int i = 0; i < regions.size(); ++i) {
+    for (int i = 0; i < (int) regions.size(); ++i) {
         
         r = &regions[i];
         
         std::cerr << prefix << "  [region " << i << "]" << NL;
-        std::cerr << prefix << TAB << "pathname:     " << r->pathname << NL;
+        std::cerr << prefix << TAB << "pathname:     ";
+        _dump_string_nullable(r->pathname.c_str());
         std::cerr << prefix << TAB << "skip/skipped: " << r->skip << "/" << r->skipped 
                                                        << NL;
     }
@@ -162,7 +176,7 @@ static inline void _dump_args_struct(std::string prefix, const args_struct * arg
     std::cerr << prefix << TAB << "input_file:         " << args->input_file << NL;
     std::cerr << prefix << NL;
 
-    std::cerr << prefix << TAB << "ui_type:            " << ui_types[args->ui_type] 
+    std::cerr << prefix << TAB << "ui_type:            " << ui_types[(int)args->ui_type] 
                                                          << NL;
     std::cerr << prefix << TAB << "ln_iface:           " << ln_ifaces[args->ln_iface] 
                                                          << NL;
@@ -174,14 +188,18 @@ static inline void _dump_args_struct(std::string prefix, const args_struct * arg
                                                          << NL;
     std::cerr << prefix << NL;
 
-    std::cerr << prefix << TAB << "alignment:          " << args->alignment << NL;
-    std::cerr << prefix << TAB << "bit_width:          " << args->bit_width << NL;
-    std::cerr << prefix << TAB << "target_addr:        " << std::hex 
+    std::cerr << prefix << TAB << "alignment:          " << (int) args->alignment 
+                                                         << NL;
+    std::cerr << prefix << TAB << "byte_width:         " << (int) args->byte_width 
+                                                         << NL;
+    std::cerr << prefix << TAB << "target_addr:        " << std::hex << "0x" 
                                                          << args->target_addr 
                                                          << std::dec << NL;
     std::cerr << NL;
 
-    std::cerr << prefix << TAB << "max_struct_size:    " << args->max_struct_size 
+    std::cerr << prefix << TAB << "max_struct_size:    " << std::hex << "0x"
+                                                         << args->max_struct_size 
+                                                         << std::dec
                                                          << NL;
     std::cerr << prefix << TAB << "max_depth:          " << args->max_depth << NL;
     std::cerr << prefix << TAB << "threads:            " << args->threads << NL;
@@ -200,20 +218,23 @@ static inline void _dump_args_struct(std::string prefix, const args_struct * arg
 }
 
 
-static inline void _dump_areas(std::string prefix, std::vector<cm_list_node *> areas) {
+static inline void _dump_areas(std::string prefix, 
+                               const std::vector<cm_list_node *> * areas) {
 
     cm_list_node * area_node;
     ln_vm_area * area;
 
-    for (int i = 0; i < areas.size(); ++i) {
+    for (int i = 0; i < (int) areas->size(); ++i) {
 
-        area_node = areas[i];
+        area_node = (*areas)[i];
         area = LN_GET_NODE_AREA(area_node);
 
         std::cerr << prefix << "  [ln_vm_area]" << NL << NL;
         
-        std::cerr << prefix << TAB << "pathname:          " << area->pathname << NL;
-        std::cerr << prefix << TAB << "basename:          " << area->basename << NL;
+        std::cerr << prefix << TAB << "pathname:          ";
+        _dump_string_nullable(area->pathname);
+        std::cerr << prefix << TAB << "basename:          ";
+        _dump_string_nullable(area->basename);
         std::cerr << NL;
 
         std::cerr << prefix << TAB << "start_addr:        " << std::hex << "0x"
@@ -236,6 +257,7 @@ static inline void _dump_areas(std::string prefix, std::vector<cm_list_node *> a
 
         std::cerr << prefix << TAB << "id:                " << area->id << NL;
         std::cerr << prefix << TAB << "mapped:            " << area->mapped << NL;
+        std::cerr << NL;
     }
 
     return;
@@ -248,7 +270,7 @@ static inline void _dump_objs(std::string prefix,
     cm_list_node * obj_node;
     ln_vm_obj * obj;
 
-    for (int i = 0; i < objs->size(); ++i) {
+    for (int i = 0; i < (int) objs->size(); ++i) {
 
         obj_node = (*objs)[i];
         
@@ -262,8 +284,10 @@ static inline void _dump_objs(std::string prefix,
 
         std::cerr << prefix << "  [ln_vm_obj]" << NL << NL;
 
-        std::cerr << prefix << TAB << "pathname:          " << obj->pathname << NL;
-        std::cerr << prefix << TAB << "basename:          " << obj->basename << NL;
+        std::cerr << prefix << TAB << "pathname:          ";
+        _dump_string_nullable(obj->pathname);
+        std::cerr << prefix << TAB << "basename:          ";
+        _dump_string_nullable(obj->basename);
         std::cerr << NL;
 
         std::cerr << prefix << TAB << "start_addr:        " << std::hex << "0x"
@@ -286,6 +310,31 @@ static inline void _dump_objs(std::string prefix,
 }
 
 
+static inline void _dump_objs_short(std::string prefix, 
+                                    const std::vector<cm_list_node *> * objs) {
+
+    cm_list_node * obj_node;
+    ln_vm_obj * obj;
+
+    std::cerr << prefix << "[serialiser objects]" << NL << NL;
+    for (int i = 0; i < (int) objs->size(); ++i) {
+
+        obj_node = (*objs)[i];
+        
+        if (obj_node == nullptr) {
+            std::cerr << prefix << "<null>" << NL << NL;
+            continue;
+        } else {
+            obj = LN_GET_NODE_OBJ(obj_node);
+            std::cerr << prefix << obj->basename << NL;
+        }
+    }
+    std::cerr << NL;
+
+    return;
+}
+
+
 static inline void _dump_mem(std::string prefix, const mem * m) {
 
     std::cerr << prefix << "  [mem]" << NL << NL;
@@ -299,57 +348,92 @@ static inline void _dump_mem(std::string prefix, const mem * m) {
                                                    << std::dec << NL;
     
     std::cerr << prefix << TAB << "rw_areas:     " << NL << NL;
-    _dump_areas(prefix + TAB, *m->get_rw_areas());
+    _dump_areas(prefix + TAB, m->get_rw_areas());
     std::cerr << prefix << TAB << "static_areas: " << NL << NL;
-    _dump_areas(prefix + TAB, *m->get_static_areas());
+    _dump_areas(prefix + TAB, m->get_static_areas());
     std::cerr << NL;
 
     return;
 }
 
 
-static inline void _dump_mem_node(std::string prefix, const mem_node * m_node) {
+static inline void _dump_mem_node_vma(const mem_node * m_node, const mem * m) {
 
-    std::cerr << prefix << "  [mem_node]" << NL << NL;
+    const std::vector<cm_list_node *> * rw_areas = m->get_rw_areas();
+    int index;
 
-    std::cerr << prefix << TAB << "rw_areas_index:     " << m_node->
-                                                            get_rw_areas_index()
-                                                         << NL;
-    std::cerr << prefix << TAB << "static_areas_index: " << m_node->
-                                                            get_static_areas_index()
-                                                         << NL;
+    cm_list_node * vma_node;
+    ln_vm_area * vma;
+
+    index = m_node->get_rw_areas_index();
+    if (index == -1) {
+        std::cerr << "<-1 index>" << NL;
+        return;
+    }
+    
+    vma_node = (*rw_areas)[index];
+    if (vma_node == nullptr) {
+        std::cerr << "<null>" << NL;
+        return;
+    }
+
+    vma = LN_GET_NODE_AREA(vma_node);
+    std::cerr << vma->basename << NL;
+    return;
+}
+
+
+static inline void _dump_mem_node(std::string prefix, 
+                                  const mem_node * m_node, 
+                                  const mem * m, int * node_count) {
+
+    std::cerr << prefix << "  [mem_node " << *node_count  << "]" << NL << NL;
+
+    std::cerr << prefix << TAB << "rw_areas_index:      " << m_node->
+                                                             get_rw_areas_index()
+                                                          << NL;
+    std::cerr << prefix << TAB << "static_areas_index:  " << m_node->
+                                                             get_static_areas_index()
+                                                          << NL;
     std::cerr << NL;
 
-    std::cerr << prefix << TAB << "addr:               " << std::hex << "0x"
-                                                         << m_node->get_addr()
-                                                         << std::dec << NL;
-    std::cerr << prefix << TAB << "ptr_addr:           " << std::hex << "0x"
-                                                         << m_node->get_ptr_addr()
-                                                         << std::dec << NL;
+    std::cerr << prefix << TAB << "addr:                " << std::hex << "0x"
+                                                          << m_node->get_addr()
+                                                          << std::dec << NL;
+    std::cerr << prefix << TAB << "ptr_addr:            " << std::hex << "0x"
+                                                          << m_node->get_ptr_addr()
+                                                          << std::dec << NL;
     std::cerr << NL;
 
-    std::cerr << prefix << TAB << "vma_node:           ";
+    std::cerr << prefix << TAB << "vma_node:            ";
     _dump_area_link(m_node->get_vma_node());
+    std::cerr << prefix << TAB << "vma_node (basename): ";
+    _dump_mem_node_vma(m_node, m);
+
     std::cerr << NL;
 
-    std::cerr << prefix << TAB << "parent:             ";
+    std::cerr << prefix << TAB << "parent:              ";
     _dump_parent(m_node);
-    std::cerr << prefix << TAB << "children:           ";
+    std::cerr << prefix << TAB << "children:            ";
     _dump_children(m_node->get_children());
+    std::cerr << NL;
 
+    *node_count += 1;
 
     return;
 }
 
 
 static inline void _dump_level(std::string prefix, 
-                               std::list<mem_node *> * level, int index) {
+                               std::list<mem_node *> * level, const mem * m,
+                               int index, int * node_count) {
 
     std::cerr << "  [level " << index << "]" << NL << NL;
     for (std::list<mem_node *>::iterator it = 
          level->begin(); it != level->end(); ++it) {
 
-        _dump_mem_node(prefix + TAB, *it);
+        _dump_mem_node(prefix + TAB, *it, m, node_count);
+
     }
 
     std::cerr << NL;
@@ -357,7 +441,9 @@ static inline void _dump_level(std::string prefix,
 
 
 static inline void _dump_mem_tree(std::string prefix, const mem_tree * m_tree,
-                                  const args_struct * args) {
+                                  const mem * m, const args_struct * args) {
+
+    int node_count = 0;
 
     std::list<mem_node *> * level;
 
@@ -366,9 +452,9 @@ static inline void _dump_mem_tree(std::string prefix, const mem_tree * m_tree,
 
     std::cerr << prefix << "  [mem_tree]" << NL << NL;
     
-    for (int i = 0; i < args->max_depth; ++i) {
+    for (int i = 0; i < (int) args->max_depth; ++i) {
         level = m_tree->get_level_list(i);
-        _dump_level(prefix + TAB, level, i);
+        _dump_level(prefix + TAB, level, m, i, &node_count);
     }
 
     return;
@@ -380,7 +466,7 @@ static inline void _dump_vma_scan_ranges(std::string prefix,
 
     vma_scan_range * range;
 
-    for (int i = 0; i < ranges->size(); ++i) {
+    for (int i = 0; i < (int) ranges->size(); ++i) {
         
         range = &(* (std::vector<vma_scan_range> *) ranges)[i];
 
@@ -406,7 +492,7 @@ static inline void _dump_threads(std::string prefix,
 
     thread * t;
 
-    for (int i = 0; i < threads->size(); ++i) {
+    for (int i = 0; i < (int) threads->size(); ++i) {
 
         t = &(* (std::vector<thread> *) threads)[i];
         
@@ -436,7 +522,7 @@ static inline void _dump_serialiser(std::string prefix, const serialiser * s) {
 
     std::cerr << prefix << "  [serialiser]" << NL << NL;
 
-    std::cerr << prefix << TAB << "bit_width: " << (int) s->get_bit_width() << NL;
+    std::cerr << prefix << TAB << "byte_width: " << (int) s->get_byte_width() << NL;
     std::cerr << prefix << TAB << "ptrchains: " << "<see stdout>" << NL;
     std::cerr << NL;
 
@@ -462,10 +548,10 @@ void __attribute__((noinline)) dump_mem(const mem * m) {
     return;
 }
 
-void __attribute__((noinline)) dump_mem_tree(const mem_tree * m_tree,
+void __attribute__((noinline)) dump_mem_tree(const mem_tree * m_tree, const mem * m,
                                              const args_struct * args) {
 
-    _dump_mem_tree("", m_tree, args);
+    _dump_mem_tree("", m_tree, m, args);
 
     return;
 }
@@ -480,6 +566,15 @@ void __attribute__((noinline)) dump_threads(const thread_ctrl * t_ctrl) {
 void __attribute__((noinline)) dump_serialiser(const serialiser * s) {
 
     _dump_serialiser("", s);
+
+    return;
+}
+
+
+void __attribute((noinline)) dump_serialiser_objs(const std::vector<cm_list_node *>
+                                                  * objs) {
+    
+    _dump_objs_short("", objs);
 
     return;
 }

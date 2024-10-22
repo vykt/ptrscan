@@ -48,7 +48,7 @@ class mem_node {
 
     private:
         //methods
-        const int check_index(const mem * m, const int mode);
+        const int check_index(const mem * m, const uintptr_t addr, const int mode);
 
     public:
         //methods

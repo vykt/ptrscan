@@ -12,7 +12,6 @@
 
 #include "mem.h"
 #include "args.h"
-#include "ui_base.h"
 
 
 // --- PRIVATE METHODS
@@ -182,6 +181,9 @@ inline void mem::add_static_vma(args_struct * args, cm_list_node * vma_node) {
 
         iter_region = &(args->extra_static_areas)[i];
 
+        //if vma->basename is null, continue
+        if (vma->basename == nullptr) continue;
+
         //continue if basename is not a match | vma->basename can't be null
         ret = strncmp(vma->basename, iter_region->pathname.c_str(), NAME_MAX);
         if (ret) continue;
@@ -249,12 +251,14 @@ void mem::populate_areas(args_struct * args) {
         "/run"
     };
 
-    int ret;
     bool exclusive_rw_found;
 
     cm_list_node * vma_node;
     ln_vm_area * vma;
 
+
+    //add standard areas
+    this->add_standard_vmas(args);
 
     //setup iteration
     vma_node = this->map.vm_areas.head;
@@ -274,22 +278,26 @@ void mem::populate_areas(args_struct * args) {
             //check if this is a blacklisted vma
             for (int i = 0; i < VMA_BLACKLIST_SIZE; ++i) {
                 if (!strncmp(vma->pathname, 
-                             vma_blacklist[i], strlen(vma_blacklist[i]))) continue;
+                             vma_blacklist[i], strlen(vma_blacklist[i])))
+                    goto populate_areas_next;
             }
 
         } //end if vma has backing object
 
         //if vma has rw-/rwx permissions
-        if (vma->access & (LN_ACCESS_READ | LN_ACCESS_WRITE)) continue;
+        if (vma->access != (LN_ACCESS_READ | LN_ACCESS_WRITE))
+            goto populate_areas_next;
 
         //if user specified an exclusive set of vmas to scan
         if (!(args->exclusive_rw_areas.empty())) {
 
             //check if this vma is in the exclusive set
-            for (int i = 0; i < args->exclusive_rw_areas.size(); ++i) {
+            for (int i = 0; i < (int) args->exclusive_rw_areas.size(); ++i) {
                 exclusive_rw_found = true;
             }
-            if (!exclusive_rw_found) continue;
+            if (!exclusive_rw_found) {
+                goto populate_areas_next;
+            }
 
         } //end if exclusive set applies
 
@@ -298,33 +306,37 @@ void mem::populate_areas(args_struct * args) {
 
         //check if this region should also be added as static
         add_static_vma(args, vma_node);
-    
+   
+populate_areas_next:
+        vma_node = vma_node->next;
+        vma = LN_GET_NODE_AREA(vma_node);
+
     } //end for
 
     return;
 }
 
 
-inline const int mem::get_pid() const {
+const int mem::get_pid() const {
     return this->pid;
 }
 
 
-inline const ln_session * mem::get_session() const {
+const ln_session * mem::get_session() const {
     return &this->session;
 }
 
 
-inline const ln_vm_map * mem::get_map() const {
+const ln_vm_map * mem::get_map() const {
     return &this->map;
 }
 
 
-inline const std::vector<cm_list_node *> * mem::get_rw_areas() const {
+const std::vector<cm_list_node *> * mem::get_rw_areas() const {
     return &this->rw_areas;
 }
 
 
-inline const std::vector<cm_list_node *> * mem::get_static_areas() const {
+const std::vector<cm_list_node *> * mem::get_static_areas() const {
     return &this->static_areas;
 }

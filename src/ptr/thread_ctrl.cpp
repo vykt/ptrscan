@@ -31,7 +31,7 @@ const uintptr_t thread_ctrl::get_rw_mem_sum(const mem * m) {
     rw_areas = m->get_rw_areas();
 
     //for every rw- vma
-    for (int i = 0; i < rw_areas->size(); ++i) {
+    for (int i = 0; i < (int) rw_areas->size(); ++i) {
         
         vma = LN_GET_NODE_AREA((*rw_areas)[i]);
         region_size = vma->end_addr - vma->start_addr;
@@ -64,7 +64,7 @@ void thread_ctrl::divide_mem(const args_struct * args,
     mem_share = mem_left / args->threads;
     region_index = region_progress = region_size = region_left = 0;
     fwd_min = 0;
-    fwd_max = args->bit_width;
+    fwd_max = args->byte_width;
 
 
     rw_areas = m->get_rw_areas();
@@ -96,8 +96,8 @@ void thread_ctrl::divide_mem(const args_struct * args,
             if (region_left > temp_share) {
                 
                 //bring up temp_share to a region boundary
-                if (temp_share % args->bit_width != 0) {
-                    temp_share += args->bit_width - (temp_share % args->bit_width);
+                if (temp_share % args->byte_width != 0) {
+                    temp_share += args->byte_width - (temp_share % args->byte_width);
                 }
 
                 //create new vma_scan_range entry for current thread
@@ -116,7 +116,7 @@ void thread_ctrl::divide_mem(const args_struct * args,
                 if (!region_left) {
                     region_index++;
                     region_progress = 0;
-                //otherwise let this thread region scan up to bit_width bytes
+                //otherwise let this thread region scan up to byte_width bytes
                 //ahead to scan gaps between thread shares
                 } else {
                     temp_range.end_addr += std::clamp(region_left, fwd_min, fwd_max);
@@ -160,9 +160,8 @@ void thread_ctrl::divide_mem(const args_struct * args,
 thread_ctrl::thread_ctrl(const args_struct * args, const mem * m, 
                          const mem_tree * m_tree, ui_base * ui) {
 
-    const char * exception_str[3] = { 
+    const char * exception_str[2] = { 
         "thread_ctrl -> init: pthread_barrier_init() failed.",
-        "thread_ctrl -> init: failed to open a liblain session for this thread.",
         "thread_ctrl -> init: pthread_create() failed."
     };
 
@@ -192,7 +191,6 @@ thread_ctrl::thread_ctrl(const args_struct * args, const mem * m,
        
         //set human readable thread id
         t_temp.set_ui_id(next_ui_id);
-        next_ui_id++;
 
         //link thread to thread_ctrl
         t_temp.link_thread(next_ui_id, &this->current_depth,
@@ -200,19 +198,19 @@ thread_ctrl::thread_ctrl(const args_struct * args, const mem * m,
         
         //open a liblain session for this thread
         t_temp.setup_session(args->ln_iface, m->get_pid());
-        if (ret == -1) {
-            throw std::runtime_error(exception_str[1]);
-        }
 
         //push new thread object
         this->threads.push_back(t_temp);
+
+        //increment next id
+        next_ui_id += next_ui_id;
     }
 
     //define memory regions each thread will scan
     divide_mem(args, m, mem_sum);
 
     //spawn each thread
-    for (int i = 0; i < this->threads.size(); ++i) { 
+    for (int i = 0; i < (int) this->threads.size(); ++i) { 
 
         //setup args structure for new thread (deallocated by thread on exit)
         t_arg = new(thread_arg);
@@ -227,7 +225,7 @@ thread_ctrl::thread_ctrl(const args_struct * args, const mem * m,
         ret = pthread_create(this->threads[i].get_id(), nullptr,
                              &thread_bootstrap, (void *) t_arg);
         if (ret != 0) {
-            throw std::runtime_error(exception_str[2]);
+            throw std::runtime_error(exception_str[1]);
         }
     }
 }
@@ -241,12 +239,10 @@ void thread_ctrl::prepare_threads(const args_struct * args,
         "thread_ctrl -> prepare_level: ln_get_area_offset returned -1. Impossible?"
     };
 
-    int ret;
     unsigned int min, max, off;
     uintptr_t allowed_struct_size;
     
     cm_list_node * vma_node;
-    ln_vm_area * vma;
 
     parent_range temp_parent_range;
     std::list<mem_node *> * level_list;
@@ -256,7 +252,7 @@ void thread_ctrl::prepare_threads(const args_struct * args,
     this->current_depth += 1;
 
     //reset current_addr for each thread
-    for (int i = 0; i < this->threads.size(); ++i) {
+    for (int i = 0; i < (int) this->threads.size(); ++i) {
         this->threads[i].reset_current_addr();
     }
 
@@ -277,10 +273,9 @@ void thread_ctrl::prepare_threads(const args_struct * args,
         temp_parent_range.end_addr = (*it)->get_addr();
 
         vma_node = (cm_list_node *) (*it)->get_vma_node();
-        vma = LN_GET_NODE_AREA(vma_node);
 
         off = (unsigned int)ln_get_area_offset(vma_node, temp_parent_range.end_addr);
-        if (off == -1) {
+        if ((int) off == -1) {
             throw std::runtime_error(exception_str[0]);
         }
 
@@ -351,7 +346,7 @@ void thread_ctrl::join_threads() {
     int * thread_ret;
 
     //for every thread
-    for (int i = 0; i < this->threads.size(); ++i) {
+    for (int i = 0; i < (int) this->threads.size(); ++i) {
         ret = pthread_join(*this->threads[i].get_id(), (void **) &thread_ret);
         if (ret != 0) {
             throw std::runtime_error(exception_str[0]);

@@ -59,7 +59,7 @@ typedef struct {
     bool use_preset_offsets;   //did user supply first n offsets?
     
     cm_byte alignment;         //boundary for alignment of pointers
-    cm_byte bit_width;         //architecture bit width (32bit/64bit, etc.)
+    cm_byte byte_width;         //architecture bit width (32bit/64bit, etc.)
     uintptr_t target_addr;     //root node address
     
     size_t max_struct_size;    //max struct size

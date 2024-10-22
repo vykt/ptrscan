@@ -78,10 +78,10 @@ ssize_t inline thread::get_next_buffer_smart(const args_struct * args,
     //else copy end of last buffer to the start of next buffer
     } else {
 
-        read_buf_effective_size = READ_BUF_SIZE - args->bit_width;
+        read_buf_effective_size = READ_BUF_SIZE - args->byte_width;
         
-        memcpy(read_buf, read_buf+(r_state->last - args->bit_width), args->bit_width);
-        memset(read_buf + args->bit_width, 0, read_buf_effective_size);
+        memcpy(read_buf, read_buf+(r_state->last - args->byte_width), args->byte_width);
+        memset(read_buf + args->byte_width, 0, read_buf_effective_size);
     }
      
     //get read target size
@@ -113,7 +113,7 @@ int thread::addr_parent_compare(const args_struct * args, const uintptr_t addr) 
         if ( (long int) args->preset_offsets[*this->current_depth - 1] != -1) {
 
             //for every parent region
-            for (int i = 0; i < this->parent_ranges->size(); ++i) {
+            for (int i = 0; i < (int) this->parent_ranges->size(); ++i) {
 
                 eval_range = (addr == (*this->parent_ranges)[i].end_addr
                               - args->preset_offsets[*this->current_depth - 1]);
@@ -128,7 +128,7 @@ int thread::addr_parent_compare(const args_struct * args, const uintptr_t addr) 
     //otherwise, accept any offset under args->max_struct_size
     
     //for every parent region
-    for (int i = 0; i < this->parent_ranges->size(); ++i) {
+    for (int i = 0; i < (int) this->parent_ranges->size(); ++i) {
 
         eval_range = addr >= (*this->parent_ranges)[i].start_addr
                      && addr <= (*this->parent_ranges)[i].end_addr;
@@ -145,11 +145,7 @@ int thread::addr_parent_compare(const args_struct * args, const uintptr_t addr) 
 void thread::thread_main(const args_struct * args, const mem * m, 
                          mem_tree * m_tree, ui_base * ui) {
 
-    const char * exception_str[1] = {
-        "thread -> thread_main: memory read into local buffer failed."
-    };
-
-    int ret, parent_index;
+    int parent_index;
     uintptr_t read_addr, potential_ptr_addr;
 
     read_state r_state;
@@ -171,7 +167,7 @@ void thread::thread_main(const args_struct * args, const mem * m,
         pthread_barrier_wait(this->depth_barrier);
 
         //for every range this thread needs to scan
-        for (int j = 0; j < this->vma_scan_ranges.size(); ++j) {
+        for (int j = 0; j < (int) this->vma_scan_ranges.size(); ++j) {
 
             //setup read state
             r_state.done = r_state.last = 0;
@@ -293,28 +289,28 @@ void thread::release_session() {
 }
 
 
-inline pthread_t * thread::get_id() {
+pthread_t * thread::get_id() {
     return &this->id;
 }
 
 
-inline const int thread::get_ui_id() const {
+const int thread::get_ui_id() const {
     return this->ui_id;
 }
 
 
-inline void thread::set_ui_id(int ui_id) {
+void thread::set_ui_id(int ui_id) {
     this->ui_id = ui_id;
     return;
 }
 
 
-inline const std::vector<vma_scan_range> * thread::get_vma_scan_ranges() const {
+const std::vector<vma_scan_range> * thread::get_vma_scan_ranges() const {
     return &this->vma_scan_ranges;
 }
 
 
-inline void thread::add_vma_scan_range(vma_scan_range range) {
+void thread::add_vma_scan_range(vma_scan_range range) {
     this->vma_scan_ranges.push_back(range);
     return;
 }

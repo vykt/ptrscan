@@ -37,11 +37,10 @@ static inline void _get_column_sizes(const serialiser * s, const mem * m,
 
     const std::vector<serial_entry> * ptrchains = s->get_ptrchains();
     const std::vector<cm_list_node *> * rw_objs = s->get_rw_objs();
-    const std::vector<cm_list_node *> * static_objs = s->get_static_objs();
 
 
     //for every pointer chain
-    for (int i = 0; i < ptrchains->size(); ++i) {
+    for (int i = 0; i < (int) ptrchains->size(); ++i) {
 
         //get object
         s_entry = (serial_entry *) &(*ptrchains)[i];
@@ -65,10 +64,10 @@ static inline void _get_column_sizes(const serialiser * s, const mem * m,
         max = -1;
 
         //for every serial entry
-        for (int i = 0; i < ptrchains->size(); ++i) {
+        for (int i = 0; i < (int) ptrchains->size(); ++i) {
 
             //get offset of next serial entry at given column
-            if ((*ptrchains)[i].offsets.size() <= column_index) continue;
+            if ((int) (*ptrchains)[i].offsets.size() <= column_index) continue;
             
             current_offset = (*ptrchains)[i].offsets[column_index];
             
@@ -151,7 +150,6 @@ void ui_term::output_ptrchains(const void * args_ptr,
     //get serialiser vectors
     const std::vector<serial_entry> * ptrchains = s->get_ptrchains();
     const std::vector<cm_list_node *> * rw_objs = s->get_rw_objs();
-    const std::vector<cm_list_node *> * static_objs = s->get_static_objs();
 
 
     //get column widths
@@ -173,7 +171,7 @@ void ui_term::output_ptrchains(const void * args_ptr,
         print_buf.clear();
 
         //set color
-        if (s_entry->static_objs_index != -1) {
+        if ((int) s_entry->static_objs_index != -1) {
             print_buf.append(GREEN);
         }
 
@@ -188,7 +186,7 @@ void ui_term::output_ptrchains(const void * args_ptr,
         print_buf.append(" + ");
 
         //format remaining offsets
-        for (int j = 0; j < s_entry->offsets.size(); ++j) {
+        for (int j = 0; j < (int) s_entry->offsets.size(); ++j) {
 
             //format offsets
             convert_buf.str(std::string());
@@ -204,7 +202,7 @@ void ui_term::output_ptrchains(const void * args_ptr,
         } //end inner for
 
         //unset color
-        if (s_entry->static_objs_index != -1) {
+        if ((int) s_entry->static_objs_index != -1) {
             print_buf.append(RESET);
         }
 
@@ -216,10 +214,8 @@ void ui_term::output_ptrchains(const void * args_ptr,
    
     //output footer
     std::cout << "\nfound " << std::dec << ptrchains->size() 
-              << " chains | aligned: "
-              //this is 'magic' to convert bool into alignment of scan in bytes
-              << (((int) args->aligned) * (sizeof(uintptr_t) - 1) + 1)
-              << " | lookback: 0x" << std::hex << args->max_struct_size 
-              << " | levels: " << std::dec << args->max_struct_size 
+              << " chains | alignment: "  << args->alignment
+              << " | max struct size: 0x" << std::hex << args->max_struct_size 
+              << " | depth: " << std::dec << args->max_depth 
               << std::endl;
 }

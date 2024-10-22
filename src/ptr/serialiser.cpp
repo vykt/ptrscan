@@ -13,6 +13,15 @@
 #include "serialiser.h"
 #include "args.h"
 #include "mem_tree.h"
+#include "debug.h"
+
+
+#define TYPE_RW     0
+#define TYPE_STATIC 1
+
+// [!] makes rw-/rwx & static indexes of serial_entry iterable
+#define ITER_INDEX(entry, type) (uint32_t *) \
+                                ((((cm_byte *) entry) + (sizeof(uint32_t) * type)))
 
 
 // --- INTERNAL
@@ -41,7 +50,7 @@ static inline void _read_value(cm_byte * value,
                                size_t size, size_t nmemb, FILE * fs) {
 
     const char * exception_str[1] = {
-        "serialiser -> record_value: fread() request failed."
+        "serialiser -> read_value: fread() request failed."
     };
 
     size_t read_last;
@@ -116,7 +125,7 @@ static inline void _read_region_name(char * name_buf , FILE * fs) {
 
 void serialiser::record_metadata(FILE * fs) {
 
-    _record_value((cm_byte *) &this->bit_width, sizeof(this->bit_width), 1, fs);
+    _record_value((cm_byte *) &this->byte_width, sizeof(this->byte_width), 1, fs);
 
     return;
 }
@@ -124,7 +133,7 @@ void serialiser::record_metadata(FILE * fs) {
 
 void serialiser::read_metadata(FILE * fs) {
 
-    _read_value((cm_byte *) &this->bit_width, sizeof(this->bit_width), 1, fs);
+    _read_value((cm_byte *) &this->byte_width, sizeof(this->byte_width), 1, fs);
 
     return;
 }
@@ -133,37 +142,25 @@ void serialiser::read_metadata(FILE * fs) {
 void serialiser::record_region_definitions(const mem * m, FILE * fs) {
 
     const cm_byte delim_region = DELIM_REGION;    
-    const std::vector<cm_list_node *> * rw_areas = m->get_rw_areas();
-    const std::vector<cm_list_node *> * static_areas = m->get_static_areas();
+    const std::vector<cm_list_node *> * rw_areas = &this->rw_objs;
+    const std::vector<cm_list_node *> * static_areas = &this->static_objs;
     const std::vector<cm_list_node *> * regions[2] = {rw_areas, static_areas};
 
-    cm_list_node * vma_node;
-    ln_vm_area * vma;
+    cm_list_node * obj_node;
     ln_vm_obj * obj;
-    char * vma_name;
 
     //for every region type
     for (int i = 0; i < 2; ++i) {
 
         //for every region
-        for (int j = 0; j < regions[i]->size(); ++j) {
+        for (int j = 0; j < (int) regions[i]->size(); ++j) {
 
-            vma_node = (*(regions[i]))[j];
-            vma = LN_GET_NODE_AREA(vma_node);
-
-            //record vma's own basename
-            if (vma->basename != nullptr) {
-                vma_name = vma->basename;
-            //record last object's basename if vma has no basename
-            } else {
-                vma_node = vma->last_obj_node_ptr;
-                obj = LN_GET_NODE_OBJ(vma_node);
-                vma_name = obj->basename;
-            }
+            obj_node = ((*regions)[i])[j];
+            obj = LN_GET_NODE_OBJ(obj_node);
 
             //record name
-            _record_value((cm_byte *) vma_name, 
-                          strnlen(vma_name, NAME_MAX), sizeof(char), fs);
+            _record_value((cm_byte *) obj->basename, 
+                          strnlen(obj->basename, NAME_MAX), sizeof(char), fs);
 
             //record delimeter
             _record_value((cm_byte *) &delim_region, 1, sizeof(delim_region), fs);
@@ -190,47 +187,32 @@ void serialiser::read_region_definitions(const mem * m, FILE * fs) {
     int delim_region;
     char name_buf[NAME_MAX];
 
+    std::vector<cm_list_node *> * objs[2] = {&this->rw_objs, &this->static_objs}; 
     cm_list_node * obj;
 
+    //for every type of object
+    for (int i = 0; i < 2; ++i) {
 
-    //for every rw-/rwx area
-    while ((delim_region = _read_char(fs, false)) != DELIM_REGION) {
+        //for every area
+        while ((delim_region = _read_char(fs, false)) != DELIM_REGION) {
 
-        //push char back into stream
-        ret = ungetc(delim_region, fs);
-        if (ret) {
-            throw std::runtime_error(exception_str[0]);
-        }
+            //push char back into stream
+            ret = ungetc(delim_region, fs);
+            if (ret == EOF) {
+                throw std::runtime_error(exception_str[0]);
+            }
 
-        //read next region name
-        _read_region_name(name_buf, fs);
+            //read next region name
+            _read_region_name(name_buf, fs);
 
-        //find corresponding region
-        obj = ln_get_vm_obj_by_basename(m->get_map(), name_buf);
-        
-        this->rw_objs.push_back(obj);
+            //find corresponding region
+            obj = ln_get_vm_obj_by_basename(m->get_map(), name_buf);
+            
+            objs[i]->push_back(obj);
 
-    } //end for every region
+        } //end for every region
 
-    //for every static area
-    while ((delim_region = _read_char(fs, false)) != DELIM_REGION) {
-
-        //push char back into stream
-        ret = ungetc(delim_region, fs);
-        if (ret) {
-            throw std::runtime_error(exception_str[0]);
-        }
-
-        //read next region name
-        _read_region_name(name_buf, fs);
-
-        //find corresponding region
-        obj = ln_get_vm_obj_by_basename(m->get_map(), name_buf);
-        
-        this->static_objs.push_back(obj);
-
-    } //end for every region
-
+    } //end for every type of object
 
     //read final delimiter (guaranteed to be DELIM_REGION)
     _read_char(fs, false);
@@ -245,7 +227,7 @@ void serialiser::record_offsets(const mem * m, FILE * fs) {
     serial_entry * s_entry;
 
     //for every ptrchain
-    for (int i = 0; i < this->ptrchains.size(); ++i) {
+    for (int i = 0; i < (int) this->ptrchains.size(); ++i) {
 
         s_entry = &this->ptrchains[i];
         
@@ -258,7 +240,7 @@ void serialiser::record_offsets(const mem * m, FILE * fs) {
                       sizeof(s_entry->static_objs_index), 1, fs);
 
         //for every offset
-        for (int j = 0; j < s_entry->offsets.size(); ++j) {
+        for (int j = 0; j < (int) s_entry->offsets.size(); ++j) {
 
             //record offset 
             _record_value((cm_byte *) &s_entry->offsets[j], 
@@ -320,6 +302,39 @@ void serialiser::read_offsets(const mem *, FILE * fs) {
 }
 
 
+//identify rw-/rwx and static indexes for this serial entry to use
+void serialiser::entry_to_disk_obj(serial_entry * s_entry) {
+
+    std::vector<cm_list_node *> * objs[2] = {&this->rw_objs, &this->static_objs}; 
+    ln_vm_obj * obj;
+
+    //set initial value (no match)
+    s_entry->rw_objs_index = s_entry->static_objs_index = -1;
+    uint32_t * index;
+
+    //for every type of object
+    for (int i = 0; i < 2; ++i) {
+
+        //for every object
+        for (int j = 0; j < (int) objs[i]->size(); ++j) {
+            
+            //determine which object to give to this serial entry
+            obj = LN_GET_NODE_OBJ((*objs[i])[j]);
+            if (!strncmp(s_entry->basename, obj->basename, NAME_MAX)) {
+                
+                index = ITER_INDEX(s_entry, i);
+                *index = j;    
+                break;
+            }
+            
+        } //end for every object
+
+    } //end for every type of object
+
+    return;
+}
+
+
 //add offset from previous node to current node, producing an offset chain
 void serialiser::recurse_offset(const mem_node * m_node, 
                                 serial_entry * s_entry, const uintptr_t last_ptr) {
@@ -343,15 +358,15 @@ void serialiser::recurse_offset(const mem_node * m_node,
 void serialiser::recurse_down(const args_struct * args, const mem * m, 
                               const mem_node * m_node, unsigned int current_depth) {
 
-    int ret;
     bool stop_going_down;
 
     uint32_t offset;
-   
+
     std::list<mem_node> * children;
     serial_entry s_entry;
+    
     ln_vm_area * vma;
-
+    
     /*
      *  stop going down if:
      *
@@ -376,14 +391,22 @@ void serialiser::recurse_down(const args_struct * args, const mem * m,
 
     //check if node is static or recursion reached max depth
     if (stop_going_down) {
-        
-        //setup new serial entry
-        s_entry.rw_objs_index = m_node->get_rw_areas_index();
-        s_entry.static_objs_index = m_node->get_static_areas_index();
-        
-        //calculate offset from backing object to node's address
+
+        //calculate offset from backing object to node's address & set basename
         vma = LN_GET_NODE_AREA(m_node->get_vma_node());
-        offset = (uint32_t) ln_get_obj_offset(vma->obj_node_ptr, m_node->get_addr());
+        if (vma->basename != nullptr) {
+            offset = (uint32_t) 
+                     ln_get_obj_offset(vma->obj_node_ptr, m_node->get_addr());
+            s_entry.basename = vma->basename;
+
+        } else {
+            offset = (uint32_t) 
+                     ln_get_obj_offset(vma->last_obj_node_ptr, m_node->get_addr());
+            s_entry.basename = LN_GET_NODE_OBJ(vma->last_obj_node_ptr)->basename;
+        }
+
+        //determine disk backing objects for this serial entry
+        this->entry_to_disk_obj(&s_entry);
 
         //add the offset
         s_entry.offsets.push_back(offset);
@@ -428,7 +451,7 @@ bool serialiser::verify_chain(const args_struct * args,
     addr = obj->start_addr;
     
     //for each offset
-    for (int i = 0; i < s_entry->offsets.size(); ++i) {
+    for (int i = 0; i < (int) s_entry->offsets.size(); ++i) {
 
         //add offset to address
         addr += s_entry->offsets[i];
@@ -449,88 +472,104 @@ bool serialiser::verify_chain(const args_struct * args,
 }
 
 
-void serialiser::remove_invalid_objs(const int start_rw_index,
-                                     const int start_static_index) {
+void serialiser::remove_unreferenced_objs() {
 
+    bool referenced;
+
+    std::vector<cm_list_node *> * objs[2] = {&this->rw_objs, &this->static_objs}; 
     serial_entry * s_entry;
-    
-    bool correct_rw = false;
-    bool correct_static = false;
+    uint32_t * index;
 
 
-    //since rw-/rwx is a superset of static, return if it is -1
-    if (start_rw_index != -1) {
+    //for every type of object
+    for (int i = 0; i < 2; ++i) {
 
-        //remove invalid rw-/rwx object
-        this->rw_objs.erase(this->rw_objs.begin() + start_rw_index);
-        correct_rw = true;
-    }
+        //for each object of this specific object type
+        for (int j = 0; j < (int) objs[i]->size(); ++j) {
 
-    //remove invalid static object if necessary
-    if (start_static_index != -1) {
+            referenced = false;
 
-        //remove invalid static object
-        this->static_objs.erase(this->static_objs.begin() + start_static_index);
-        correct_static = true;
-    }
+            //check if any pointer chain uses this object
+            for (int k = 0; k < (int) this->ptrchains.size(); ++k) {
 
+                s_entry = &this->ptrchains[k];
+                index = ITER_INDEX(s_entry, i);
 
-    //for every pointer chain
-    for (int i = 0; i < this->ptrchains.size(); ++i) {
+                //if this object has references
+                if (*index == (uint32_t) j) referenced = true;
+                
+            } //end for each pointer chain
 
-        //fetch pointer chain
-        s_entry = &this->ptrchains[i];
-        
-        //if its rw-/rwx index was affected by the removal of the invalid object, 
-        //then correct it
-        if (correct_rw && s_entry->rw_objs_index > start_rw_index) {
-            s_entry->rw_objs_index -= 1;
-        }
+            //keep this object if it is referenced
+            if (referenced) continue;
 
-        //if its static index was affected by the removal of the invalid object,
-        //then correct it
-        if (correct_static && s_entry->static_objs_index > start_static_index) {
-            s_entry->static_objs_index -= 1;
-        }
+            //remove this object
+            objs[i]->erase(objs[i]->begin() + j);
 
-    } //end for every pointer chain
+            //correct indexes of pointer chains
+            for (int k = 0; k < (int) this->ptrchains.size(); ++k) {
+
+                s_entry = &this->ptrchains[k];
+                index = ITER_INDEX(s_entry, i);
+
+                //
+                if (*index >= (uint32_t) j) *index -= 1;
+                
+            } //end for each pointer chain
+            
+            //correct iteration
+            j -= 1;
+
+        } //end for each object
+
+    } //end for each object type
 
     return;
 }
 
 
-//clean up intermediate state by removing invalid backing objects
-void serialiser::cleanup_intermediate() {
+//remove duplicate entries from object and static vectors 
+void serialiser::remove_duplicate_objs() {
 
-    serial_entry * s_entry;
-    cm_list_node * obj_node_rw, * obj_node_static;
+    cm_list_node * prev_obj_node, * curr_obj_node;
+    ln_vm_obj * prev_obj, * curr_obj;
 
-    int start_rw_index     = -1;
-    int start_static_index = -1;
+    std::vector<cm_list_node *> * objs[2] = {&this->rw_objs, &this->static_objs}; 
 
-    //for every pointer chain
-    for (int i = 0; i < this->ptrchains.size(); ++i) {
 
-        s_entry  = &this->ptrchains[i];
-        obj_node_rw = this->rw_objs[s_entry->rw_objs_index];
-        if (s_entry->static_objs_index != -1) {
-            obj_node_static = this->rw_objs[s_entry->static_objs_index];
-        }
+    //for every type of object
+    for (int i = 0; i < 2; ++i) {
 
-        //if backing rw object was not found
-        if (obj_node_rw == nullptr) {
-            start_rw_index = s_entry->rw_objs_index;
-        }
+        //setup iteration
+        prev_obj_node = (*objs[i])[0];
+        prev_obj = LN_GET_NODE_OBJ(prev_obj_node);
 
-        //if backing static object was not found
-        if (obj_node_static == nullptr) {
-            start_static_index = s_entry->static_objs_index;
-        }
+        //for every object of a specific type
+        for (int j = 1; j < (int) objs[i]->size(); ++j) {
 
-        //cleanup
-        remove_invalid_objs(start_rw_index, start_static_index);
+            curr_obj_node = (*objs[i])[j];
+            curr_obj = LN_GET_NODE_OBJ(curr_obj_node);
 
-    } //end for every pointer chain
+            //if this object's basename is the same as the last object's basename
+            if (!strncmp(curr_obj->basename, prev_obj->basename, NAME_MAX)) {
+
+                //delete duplicate object
+                objs[i]->erase(objs[i]->begin() + j - 1);
+                
+                //correct iteration state
+                j -= 1;
+                prev_obj_node = (*objs[i])[j - 1];
+                prev_obj = LN_GET_NODE_OBJ(prev_obj_node);
+                continue;
+
+            } //end if basename the same
+            
+            //increment prev iterator
+            prev_obj = curr_obj;
+
+        } //end for every object
+
+    } //end for every type of object
 
     return;
 }
@@ -546,7 +585,6 @@ void serialiser::record_pscan(const args_struct * args, const mem * m) {
     }; 
     
     FILE * fs;
-    
 
     //open output file
     fs = fopen(args->output_file.c_str(), "w");
@@ -610,26 +648,47 @@ void serialiser::serialise_tree(const args_struct * args,
 
     ln_vm_area * vma;
 
-    const std::vector<cm_list_node *> * rw_areas = m->get_rw_areas();
-    const std::vector<cm_list_node *> * static_areas = m->get_static_areas();
+    std::vector<cm_list_node *> * rw_areas;
+    std::vector<cm_list_node *> * static_areas;
+
+    rw_areas = (std::vector<cm_list_node *> *) m->get_rw_areas();
+    static_areas = (std::vector<cm_list_node *> *) m->get_static_areas();
+
+    std::vector<cm_list_node *> * objs[2] = {rw_areas, static_areas}; 
 
 
     //populate intermediate representation
-    this->bit_width = args->bit_width;
+    this->byte_width = args->byte_width;
 
-    //for all rw-/rwx areas
-    for (int i = 0; i < rw_areas->size(); ++i) {
+    //for each type of area
+    for (int i = 0; i < 2; ++i) {
 
-        vma = LN_GET_NODE_AREA((*rw_areas)[i]);
-        this->rw_objs.push_back(vma->obj_node_ptr);
-    }
-    
-    //for all static areas
-    for (int i = 0; i < static_areas->size(); ++i) {
+        //for all areas of a specific type
+        for (int j = 0; j < (int) objs[i]->size(); ++j) {
 
-        vma = LN_GET_NODE_AREA((*static_areas)[i]);
-        this->static_objs.push_back(vma->obj_node_ptr);
-    }
+            vma = LN_GET_NODE_AREA((*objs[i])[j]);
+            if (vma->basename != nullptr) {
+                this->rw_objs.push_back(vma->obj_node_ptr);
+            } else {
+                this->rw_objs.push_back(vma->last_obj_node_ptr);
+            }
+
+        } //end for each area
+
+    } //end for each type of area
+
+    #ifdef DEBUG
+    dump_serialiser_objs(&this->rw_objs);
+    dump_serialiser_objs(&this->static_objs);
+    #endif
+
+    //remove duplicates
+    this->remove_duplicate_objs();
+
+    #ifdef DEBUG
+    dump_serialiser_objs(&this->rw_objs);
+    dump_serialiser_objs(&this->static_objs);
+    #endif
 
     //start recursive depth first traversal from root
     this->recurse_down(args, m, m_tree->get_root_node(), 0);
@@ -644,13 +703,11 @@ void serialiser::verify(const args_struct * args, const mem * m) {
     bool valid;
 
     serial_entry * s_entry;
-
     cm_list_node * obj_node;
-    ln_vm_obj * obj;
 
 
     //for each pointer chain, verify the chain
-    for (int i = 0; i < this->ptrchains.size(); ++i) {
+    for (int i = 0; i < (int) this->ptrchains.size(); ++i) {
 
         s_entry  = &this->ptrchains[i];
         obj_node = this->rw_objs[s_entry->rw_objs_index];
@@ -660,8 +717,6 @@ void serialiser::verify(const args_struct * args, const mem * m) {
             this->ptrchains.erase(this->ptrchains.begin() + i);
             --i;
         }
-
-        obj = LN_GET_NODE_OBJ(obj_node);
 
         //if chain arrives at the wrong address
         valid = verify_chain(args, m, s_entry);
@@ -673,14 +728,14 @@ void serialiser::verify(const args_struct * args, const mem * m) {
     } //end for each pointer chain
 
     //clean up invalid backing objects
-    cleanup_intermediate();
+    remove_unreferenced_objs();
 
     return;
 }
 
 
-cm_byte serialiser::get_bit_width() const {
-    return this->bit_width;
+cm_byte serialiser::get_byte_width() const {
+    return this->byte_width;
 }
 
 const std::vector<serial_entry> * serialiser::get_ptrchains() const {    
