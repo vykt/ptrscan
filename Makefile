@@ -2,7 +2,7 @@
 
 #TODO [set as required] TODO
 CXX=g++
-CXXFLAGS=-ggdb -Wall -fPIC
+CXXFLAGS=-Wall -fPIC
 INCLUDE=-lcmore -llain
 
 PTR_DIR="./src/ptr"
@@ -18,9 +18,9 @@ INSTALL_DIR=/usr/local
 
 #[set build options]
 ifeq ($(build),debug)
-	CPPFLAGS += -O0 -fsanitize=address,thread
+	CXXFLAGS += -O0 -ggdb -DDEBUG
 else
-	CPPFLAGS += -O3 -march=native
+	CXXFLAGS += -O3 -march=native
 endif
 
 
@@ -45,7 +45,7 @@ tgt:
 > $(MAKE) -C ${TGT_DIR} tgt CXX='${CXX}' BUILD_DIR='${BUILD_DIR}'
 
 ptrscan:
-> $(MAKE) -C ${PTR_DIR} ptrscan CXX='${CXX}' CPPFLAGS='${CXXFLAGS}' INCLUDE='${INCLUDE}' BUILD_DIR='${BUILD_DIR}'
+> $(MAKE) -C ${PTR_DIR} ptr CXX='${CXX}' CXXFLAGS='${CXXFLAGS}' INCLUDE='${INCLUDE}' BUILD_DIR='${BUILD_DIR}'
 
 clean:
 > $(MAKE) -C ${PTR_DIR} clean_all CXX='${CXX}' CXXFLAGS='${CXXFLAGS}' BUILD_DIR='${BUILD_DIR}'
