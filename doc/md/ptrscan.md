@@ -50,8 +50,8 @@ Report on progress for each thread at each depth level. This floods the terminal
 **-A** *ALIGNMENT*, **--alignment**=*ALIGNMENT*  
 Boundary to which pointers are aligned. For example: If set to 4, **ptrscan** will only scan for pointers at 0x4, 0x8, 0xc, [...].
 
-**-b** *BIT_WIDTH*, **--bit-width**=*BIT_WIDTH*  
-Maximum number of bits the target's architecture can process simultaneously. For example: On x86 bit width is 4, on x86\_64 bit width is 8.
+**-b** *BIT_WIDTH*, **--byte-width**=*BIT_WIDTH*  
+Maximum number of bytes the target's architecture can process simultaneously. For example: On x86 byte width is 4, on x86\_64 byte idth is 8.
 
 **-a** *ADDRESS*, **--target-address**=*ADDRESS*  
 Address to pointer scan for.
@@ -98,7 +98,7 @@ The following two examples follow the most common use case. Note that the addres
 
 **ptrscan** **-a** *0x1000* **-b** *8* **-A** *2* **-s** 0x200 **-d** *4* **-t** *6* **-w** *first.pscan* *1337*
 
-Pointer scan for address *0x1000* (**-a**). Set architecture's bit width to *8* (**-b**). Set pointer alignment in the target to *2* (**-A**). Accept structure sizes up to *0x200* bytes (**-s**). Scan up to the depth of *4* levels (**-d**). Use *6* threads for the scan (**-t**). Save the discovered pointer chains to *first.pscan* (**-w**). The target process has a PID of *1337*.
+Pointer scan for address *0x1000* (**-a**). Set architecture's byte width to *8* (**-b**). Set pointer alignment in the target to *2* (**-A**). Accept structure sizes up to *0x200* bytes (**-s**). Scan up to the depth of *4* levels (**-d**). Use *6* threads for the scan (**-t**). Save the discovered pointer chains to *first.pscan* (**-w**). The target process has a PID of *1337*.
 
 **ptrscan** **-a** *0x2000* **-r** *first.pscan* **-x** **-w** *verified.pscan* *target*.
 
