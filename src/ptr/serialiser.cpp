@@ -213,9 +213,6 @@ void serialiser::read_region_definitions(const mem * m, FILE * fs) {
         } //end for every region
 
     } //end for every type of object
-
-    //read final delimiter (guaranteed to be DELIM_REGION)
-    _read_char(fs, false);
     
     return;
 }
@@ -269,6 +266,7 @@ void serialiser::read_offsets(const mem *, FILE * fs) {
 
 
     //bootstrap loop
+    s_entry.basename = nullptr;
     _read_value((cm_byte *) &delim_offset, sizeof(delim_offset), 1, fs);
 
     //while more offset sets
@@ -294,11 +292,15 @@ void serialiser::read_offsets(const mem *, FILE * fs) {
 
         } //end while offsets
 
+        this->ptrchains.push_back(s_entry);
+        s_entry.offsets.clear();
+
         //get next rw-/rwx index/delimiter
         _read_value((cm_byte *) &delim_offset, sizeof(delim_offset), 1, fs);
 
     } //end while more offset sets
 
+    return;
 }
 
 
@@ -651,10 +653,13 @@ void serialiser::serialise_tree(const args_struct * args,
     std::vector<cm_list_node *> * rw_areas;
     std::vector<cm_list_node *> * static_areas;
 
+    //get iterable vector of mem areas
     rw_areas = (std::vector<cm_list_node *> *) m->get_rw_areas();
     static_areas = (std::vector<cm_list_node *> *) m->get_static_areas();
-
-    std::vector<cm_list_node *> * objs[2] = {rw_areas, static_areas}; 
+    std::vector<cm_list_node *> * areas[2] = {rw_areas, static_areas}; 
+    
+    //get iterable vector of serialiser objects
+    std::vector<cm_list_node *> * objs[2] = {&this->rw_objs, &this->static_objs};
 
 
     //populate intermediate representation
@@ -664,13 +669,13 @@ void serialiser::serialise_tree(const args_struct * args,
     for (int i = 0; i < 2; ++i) {
 
         //for all areas of a specific type
-        for (int j = 0; j < (int) objs[i]->size(); ++j) {
+        for (int j = 0; j < (int) areas[i]->size(); ++j) {
 
-            vma = LN_GET_NODE_AREA((*objs[i])[j]);
+            vma = LN_GET_NODE_AREA((*areas[i])[j]);
             if (vma->basename != nullptr) {
-                this->rw_objs.push_back(vma->obj_node_ptr);
+                objs[i]->push_back(vma->obj_node_ptr);
             } else {
-                this->rw_objs.push_back(vma->last_obj_node_ptr);
+                objs[i]->push_back(vma->last_obj_node_ptr);
             }
 
         } //end for each area
