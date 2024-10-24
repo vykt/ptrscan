@@ -372,12 +372,12 @@ static inline void _dump_mem_node_vma(const mem_node * m_node, const mem * m) {
     }
     
     vma_node = (*rw_areas)[index];
-    if (vma_node == nullptr) {
+    vma = LN_GET_NODE_AREA(vma_node);
+    if (vma->basename == nullptr) {
         std::cerr << "<null>" << NL;
         return;
     }
 
-    vma = LN_GET_NODE_AREA(vma_node);
     std::cerr << vma->basename << NL;
     return;
 }
@@ -385,9 +385,12 @@ static inline void _dump_mem_node_vma(const mem_node * m_node, const mem * m) {
 
 static inline void _dump_mem_node(std::string prefix, 
                                   const mem_node * m_node, 
-                                  const mem * m, int * node_count) {
+                                  const mem * m) {
 
-    std::cerr << prefix << "  [mem_node " << *node_count  << "]" << NL << NL;
+    std::cerr << prefix << "  [mem_node]" << NL << NL;
+
+    std::cerr << prefix << TAB << "id:                  " << m_node->get_id() << NL;
+    std::cerr << NL;
 
     std::cerr << prefix << TAB << "rw_areas_index:      " << m_node->
                                                              get_rw_areas_index()
@@ -418,21 +421,19 @@ static inline void _dump_mem_node(std::string prefix,
     _dump_children(m_node->get_children());
     std::cerr << NL;
 
-    *node_count += 1;
-
     return;
 }
 
 
 static inline void _dump_level(std::string prefix, 
-                               std::list<mem_node *> * level, const mem * m,
-                               int index, int * node_count) {
+                               std::list<mem_node *> * level,
+                               const mem * m, int index) {
 
     std::cerr << "  [level " << index << "]" << NL << NL;
     for (std::list<mem_node *>::iterator it = 
          level->begin(); it != level->end(); ++it) {
 
-        _dump_mem_node(prefix + TAB, *it, m, node_count);
+        _dump_mem_node(prefix + TAB, *it, m);
 
     }
 
@@ -443,8 +444,6 @@ static inline void _dump_level(std::string prefix,
 static inline void _dump_mem_tree(std::string prefix, const mem_tree * m_tree,
                                   const mem * m, const args_struct * args) {
 
-    int node_count = 0;
-
     std::list<mem_node *> * level;
 
     std::cerr << prefix << "root_node: " << m_tree->get_root_node()->get_id() << NL;
@@ -454,7 +453,7 @@ static inline void _dump_mem_tree(std::string prefix, const mem_tree * m_tree,
     
     for (int i = 0; i < (int) args->max_depth; ++i) {
         level = m_tree->get_level_list(i);
-        _dump_level(prefix + TAB, level, m, i, &node_count);
+        _dump_level(prefix + TAB, level, m, i);
     }
 
     return;

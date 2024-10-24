@@ -188,7 +188,7 @@ void serialiser::read_region_definitions(const mem * m, FILE * fs) {
     char name_buf[NAME_MAX];
 
     std::vector<cm_list_node *> * objs[2] = {&this->rw_objs, &this->static_objs}; 
-    cm_list_node * obj;
+    cm_list_node * obj_node;
 
     //for every type of object
     for (int i = 0; i < 2; ++i) {
@@ -206,9 +206,9 @@ void serialiser::read_region_definitions(const mem * m, FILE * fs) {
             _read_region_name(name_buf, fs);
 
             //find corresponding region
-            obj = ln_get_vm_obj_by_basename(m->get_map(), name_buf);
+            obj_node = ln_get_vm_obj_by_basename(m->get_map(), name_buf);
             
-            objs[i]->push_back(obj);
+            objs[i]->push_back(obj_node);
 
         } //end for every region
 
@@ -458,10 +458,12 @@ bool serialiser::verify_chain(const args_struct * args,
         //add offset to address
         addr += s_entry->offsets[i];
         
-        //read new address
-        ret = ln_read(m->get_session(), addr, (cm_byte *) &addr, sizeof(addr));
-        if (ret) {
-            return false;
+        //read new address unless this is the last iteration
+        if (i != (int) (s_entry->offsets.size() - 1)) {
+            ret = ln_read(m->get_session(), addr, (cm_byte *) &addr, sizeof(addr));
+            if (ret) {
+                return false;
+            }
         }
 
     } //end for each offset
@@ -709,6 +711,7 @@ void serialiser::verify(const args_struct * args, const mem * m) {
 
     serial_entry * s_entry;
     cm_list_node * obj_node;
+    ln_vm_obj * obj;
 
 
     //for each pointer chain, verify the chain
@@ -721,13 +724,19 @@ void serialiser::verify(const args_struct * args, const mem * m) {
         if (obj_node == nullptr) {
             this->ptrchains.erase(this->ptrchains.begin() + i);
             --i;
+            continue;
         }
+
+        #ifdef DEBUG
+        obj = LN_GET_NODE_OBJ(obj_node);
+        #endif
 
         //if chain arrives at the wrong address
         valid = verify_chain(args, m, s_entry);
         if (!valid) {
             this->ptrchains.erase(this->ptrchains.begin() + i);
             --i;
+            continue;
         }
 
     } //end for each pointer chain

@@ -171,7 +171,7 @@ void ui_term::output_ptrchains(const void * args_ptr,
         print_buf.clear();
 
         //set color
-        if ((int) s_entry->static_objs_index != -1) {
+        if (args->colour && ((int) s_entry->static_objs_index != -1)) {
             print_buf.append(GREEN);
         }
 
@@ -202,7 +202,7 @@ void ui_term::output_ptrchains(const void * args_ptr,
         } //end inner for
 
         //unset color
-        if ((int) s_entry->static_objs_index != -1) {
+        if (args->colour && ((int) s_entry->static_objs_index != -1)) {
             print_buf.append(RESET);
         }
 
