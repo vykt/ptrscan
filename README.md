@@ -1,5 +1,9 @@
 # ptrscan
 
+<p align="center">
+    <img src="ptrscan.png" width="150" height="150">
+</p>
+
 ### ABOUT:
 
 Pointer Scanner (**ptrscan**) is a dynamic analysis utility for discovering related pointers within a target process. 
