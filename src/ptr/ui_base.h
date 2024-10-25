@@ -20,8 +20,7 @@ class ui_base {
                                         const int human_thread_id) = 0;
     
     //passing void * instead of serialise * to solve circular header include
-    virtual void output_ptrchains(const void * args_ptr,
-                                  const void * s_ptr, const void * m_ptr) = 0;
+    virtual void output_ptrchains(const void * args_ptr, const void * s_ptr) = 0;
 };
 
 

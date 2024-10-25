@@ -31,6 +31,8 @@ static inline void _set_default_args(args_struct * args) {
     args->max_depth = 5;
     args->threads   = 1;
 
+    args->mode = -1;
+
     return;
 }
 
@@ -177,7 +179,6 @@ int process_args(int argc, char ** argv, args_struct * args) {
         "process_args: use: -R <name:str>,<skip:int>:[...] --exclusive-rw-regions=<name:str>,<skip:int>:[...]",
         "process_args: use: -O <off1:uintptr_t>,<off2:intptr_t>,[...] --preset-offsets=<off1:uintptr_t>,<off2:uintptr_t>,[...]",
         "process_args: use: ptrscan [flags] <target_name | target_pid>",
-        "process_args: conflicting flags."
     };
 
     //defined cmdline options
@@ -334,18 +335,22 @@ int process_args(int argc, char ** argv, args_struct * args) {
         }
     }
 
-    //assign target string and check for null
-    if (argv[optind] == 0) {
-        throw std::runtime_error(exception_str[9]);
-    }
-    args->target_str.assign(argv[optind]);
-
-    //return the earliest mode that is not eliminated
+    //set mode to earliest match
     for (int i = 0; i < MODE_NUM; ++i) {
-        if (mode_array[i] != -1) return mode_array[i];
+        if (mode_array[i] != -1) {
+            args->mode = mode_array[i];
+            break;
+        }
     } //end for
-    
-    //otherwise, throw an exception
-    throw std::runtime_error(exception_str[10]);
-    return -1;
+
+    //assign target string and check for null
+    if (argv[optind] == 0 && args->mode != MODE_READ) {
+        throw std::runtime_error(exception_str[9]);
+    } else if (args->mode != MODE_READ) {
+        args->target_str.assign(argv[optind]);
+    } else {
+        args->target_str.assign("<null>");
+    }
+
+    return args->mode;
 }

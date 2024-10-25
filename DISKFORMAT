@@ -15,10 +15,13 @@ This file defines the binary format used by ptrscan to store pointer chains.
  --- METADATA:
 
      format:
-        <bitwidth>
+        <byte_width><alignment><max_struct_size><depth>
 
      where:
-        <bitwidth>   : uint16_t     : bit width of the pointers in the scan.
+        <byte_width>      : byte    : byte width of the pointers in the scan.
+        <alignment>       : byte    : alignment of pointers.
+        <max_struct_size> : uint    : max size of struct accepted in this scan.
+        <depth>           : uint    : depth of this scan.
 
 
  --- RW_REGION_DEFINITIONS:

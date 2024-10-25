@@ -1,3 +1,13 @@
+[FIX]
+
+- Implement separate .pscan reading code which just displays the chains without
+  trying to link them to existing backing objects. It also shouldn't take a target 
+  argument.
+
+
+
+[FEATURES]
+
 -Implement a handler for CTRL+C during scanning which will terminate the scan and save the results acquired so far.
 
 -Differentiate between different objects with same pathname/basename.

@@ -1,4 +1,5 @@
 #include <vector>
+#include <string>
 #include <stdexcept>
 
 #include <cstdio>
@@ -50,7 +51,7 @@ static inline void _read_value(cm_byte * value,
                                size_t size, size_t nmemb, FILE * fs) {
 
     const char * exception_str[1] = {
-        "serialiser -> read_value: fread() request failed."
+        "serialiser -> _read_value: fread() request failed."
     };
 
     size_t read_last;
@@ -68,8 +69,8 @@ static inline void _read_value(cm_byte * value,
 static inline char _read_char(FILE * fs, bool expect_EOF) {
 
     const char * exception_str[2] = {
-        "serialiser -> read_region_definitions: error reading .pscan file.",
-        "serialiser -> read_region_definitions: unexpected end of .pscan file."
+        "serialiser -> _read_char: error reading .pscan file.",
+        "serialiser -> _read_char: unexpected end of .pscan file."
     };
 
     int ret;
@@ -126,6 +127,10 @@ static inline void _read_region_name(char * name_buf , FILE * fs) {
 void serialiser::record_metadata(FILE * fs) {
 
     _record_value((cm_byte *) &this->byte_width, sizeof(this->byte_width), 1, fs);
+    _record_value((cm_byte *) &this->alignment, sizeof(this->alignment), 1, fs);
+    _record_value((cm_byte *) &this->max_struct_size, 
+                  sizeof(this->max_struct_size), 1, fs);
+    _record_value((cm_byte *) &this->max_depth, sizeof(this->max_depth), 1, fs);
 
     return;
 }
@@ -134,6 +139,10 @@ void serialiser::record_metadata(FILE * fs) {
 void serialiser::read_metadata(FILE * fs) {
 
     _read_value((cm_byte *) &this->byte_width, sizeof(this->byte_width), 1, fs);
+    _read_value((cm_byte *) &this->alignment, sizeof(this->alignment), 1, fs);
+    _read_value((cm_byte *) &this->max_struct_size, 
+                sizeof(this->max_struct_size), 1, fs);
+    _read_value((cm_byte *) &this->max_depth, sizeof(this->max_depth), 1, fs);
 
     return;
 }
@@ -176,11 +185,12 @@ void serialiser::record_region_definitions(const mem * m, FILE * fs) {
 }
 
 
-void serialiser::read_region_definitions(const mem * m, FILE * fs) {
+void serialiser::read_region_definitions(const args_struct * args,
+                                         const mem * m, FILE * fs) {
 
     const char * exception_str[1] = {
         "serialiser -> read_region_definitions: ungetc() failed."
-    }; 
+    };
 
     int ret;
 
@@ -188,6 +198,8 @@ void serialiser::read_region_definitions(const mem * m, FILE * fs) {
     char name_buf[NAME_MAX];
 
     std::vector<cm_list_node *> * objs[2] = {&this->rw_objs, &this->static_objs}; 
+    std::vector<std::string> * read_objs[2] = {&this->read_rw_objs, 
+                                               &this->read_static_objs};
     cm_list_node * obj_node;
 
     //for every type of object
@@ -205,10 +217,18 @@ void serialiser::read_region_definitions(const mem * m, FILE * fs) {
             //read next region name
             _read_region_name(name_buf, fs);
 
-            //find corresponding region
-            obj_node = ln_get_vm_obj_by_basename(m->get_map(), name_buf);
+            //if in read mode
+            if (args->mode == MODE_READ) {
             
-            objs[i]->push_back(obj_node);
+                read_objs[i]->push_back(name_buf);
+
+            //else in verify mode, find corresponding region
+            } else {
+           
+                obj_node = ln_get_vm_obj_by_basename(m->get_map(), name_buf);
+                objs[i]->push_back(obj_node);
+            
+            } //end if
 
         } //end for every region
 
@@ -218,7 +238,7 @@ void serialiser::read_region_definitions(const mem * m, FILE * fs) {
 }
 
 
-void serialiser::record_offsets(const mem * m, FILE * fs) {
+void serialiser::record_offsets(FILE * fs) {
 
     const uint32_t delim_offset = DELIM_OFFSET;
     serial_entry * s_entry;
@@ -257,7 +277,7 @@ void serialiser::record_offsets(const mem * m, FILE * fs) {
 }
 
 
-void serialiser::read_offsets(const mem *, FILE * fs) {
+void serialiser::read_offsets(FILE * fs) {
 
     //FORMAT: [rw region id][static region id][offset 0]<...>[offset n][DELIM_OFFSET]
 
@@ -603,7 +623,7 @@ void serialiser::record_pscan(const args_struct * args, const mem * m) {
     record_region_definitions(m, fs);
 
     //record offsets
-    record_offsets(m, fs);
+    record_offsets(fs);
 
 
     //close output file
@@ -633,10 +653,10 @@ void serialiser::read_pscan(const args_struct * args, const mem * m) {
     read_metadata(fs);
 
     //read region defintions
-    read_region_definitions(m, fs);
+    read_region_definitions(args, m, fs);
 
     //read offsets
-    read_offsets(m, fs);
+    read_offsets(fs);
 
 
     //close input file
@@ -665,7 +685,12 @@ void serialiser::serialise_tree(const args_struct * args,
 
 
     //populate intermediate representation
-    this->byte_width = args->byte_width;
+    
+    //set metadata
+    this->byte_width      = args->byte_width;
+    this->alignment       = args->alignment;
+    this->max_struct_size = args->max_struct_size;
+    this->max_depth       = args->max_depth;
 
     //for each type of area
     for (int i = 0; i < 2; ++i) {
@@ -699,6 +724,9 @@ void serialiser::serialise_tree(const args_struct * args,
 
     //start recursive depth first traversal from root
     this->recurse_down(args, m, m_tree->get_root_node(), 0);
+
+    //removed unreferenced objects
+    this->remove_unreferenced_objs();
 
     return;
 }
@@ -752,6 +780,18 @@ cm_byte serialiser::get_byte_width() const {
     return this->byte_width;
 }
 
+cm_byte serialiser::get_alignment() const {
+    return this->alignment;
+}
+
+unsigned int serialiser::get_max_struct_size() const {
+    return this->max_struct_size;
+}
+
+unsigned int serialiser::get_max_depth() const {
+    return this->max_depth;
+}
+
 const std::vector<serial_entry> * serialiser::get_ptrchains() const {    
     return &this->ptrchains;
 }
@@ -762,4 +802,12 @@ const std::vector<cm_list_node *> * serialiser::get_rw_objs() const {
 
 const std::vector<cm_list_node *> * serialiser::get_static_objs() const {
     return &this->static_objs;
+}
+
+const std::vector<std::string> * serialiser::get_read_rw_objs() const {
+    return &this->read_rw_objs;
+}
+
+const std::vector<std::string> * serialiser::get_read_static_objs() const {
+    return &this->read_static_objs;
 }

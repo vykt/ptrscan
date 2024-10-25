@@ -58,8 +58,12 @@ static inline void _do_scan(const args_struct * args, mem * m,
 }
 
 
-static inline void _mode_scan(args_struct * args, mem * m,
-                              serialiser * s, ui_base * ui) {
+static inline void _mode_scan(args_struct * args, serialiser * s, ui_base * ui) {
+
+    mem * m;
+
+    //instantiate memory manager
+    m = new mem(args);
 
     //populate rw-/rwx & static areas
     m->populate_areas(args);
@@ -82,14 +86,18 @@ static inline void _mode_scan(args_struct * args, mem * m,
     #endif
 
     //output results
-    ui->output_ptrchains(args, s, m);
+    ui->output_ptrchains(args, s);
 
     return;
 }
 
 
-static inline void _mode_scan_write(args_struct * args, 
-                                    mem * m, serialiser * s, ui_base * ui) {
+static inline void _mode_scan_write(args_struct * args, serialiser * s, ui_base * ui) {
+
+    mem * m;
+
+    //instantiate memory manager
+    m = new mem(args);
 
     //populate rw-/rwx & static areas
     m->populate_areas(args);
@@ -115,31 +123,30 @@ static inline void _mode_scan_write(args_struct * args,
     #endif 
 
     //output results
-    ui->output_ptrchains(args, s, m);
+    ui->output_ptrchains(args, s);
 
     return;
 }
 
 
-static inline void _mode_read(args_struct * args, mem * m,
-                              serialiser * s, ui_base * ui) {
+static inline void _mode_read(args_struct * args, serialiser * s, ui_base * ui) {
 
     //read results
-    s->read_pscan(args, m);
-
-    #ifdef DEBUG
-    dump_serialiser(s);
-    #endif
+    s->read_pscan(args, nullptr); //passing null ok here, never used when reading
 
     //output results
-    ui->output_ptrchains(args, s, m);
+    ui->output_ptrchains(args, s);
 
     return;
 }
 
 
-static inline void _mode_verify(args_struct * args, mem * m,
-                                serialiser * s, ui_base * ui) {
+static inline void _mode_verify(args_struct * args, serialiser * s, ui_base * ui) {
+
+    mem * m;
+
+    //instantiate memory manager
+    m = new mem(args);
 
     //read results
     s->read_pscan(args, m);
@@ -152,15 +159,20 @@ static inline void _mode_verify(args_struct * args, mem * m,
     #endif
 
     //output results
-    ui->output_ptrchains(args, s, m);
+    ui->output_ptrchains(args, s);
 
     return;
 }
 
 
 
-static inline void _mode_verify_write(args_struct * args, mem * m,
+static inline void _mode_verify_write(args_struct * args, 
                                       serialiser * s, ui_base * ui) {
+
+    mem * m;
+
+    //instantiate memory manager
+    m = new mem(args);
 
     //read results
     s->read_pscan(args, m);
@@ -176,7 +188,7 @@ static inline void _mode_verify_write(args_struct * args, mem * m,
     #endif
 
     //output results
-    ui->output_ptrchains(args, s, m);
+    ui->output_ptrchains(args, s);
 
     return;
 }
@@ -190,7 +202,6 @@ int main(int argc, char ** argv) {
     args_struct args;
     
     //objects
-    mem * m;
     serialiser * s;
     ui_base * ui;
 
@@ -208,9 +219,6 @@ int main(int argc, char ** argv) {
             //TODO ncurses interface goes here, for now use term
             ui = new ui_term();
         }
-
-        //instantiate memory manager
-        m = new mem(&args);
 
         //instantiate a serialiser
         s = new serialiser();
@@ -235,32 +243,32 @@ int main(int argc, char ** argv) {
             //scan and output results, do not save to a file
             case MODE_SCAN:
 
-                _mode_scan(&args, m, s, ui);
+                _mode_scan(&args, s, ui);
                 break;
 
 
             //scan, output results and save to a file
             case MODE_SCAN_WRITE:
 
-                _mode_scan_write(&args, m, s, ui);
+                _mode_scan_write(&args, s, ui);
                 break;
 
             //do not scan, only print results read from a file
             case MODE_READ:
 
-                _mode_read(&args, m, s, ui);
+                _mode_read(&args, s, ui);
                 break;
 
             //rescan based on file, print results, do not save to file
             case MODE_VERIFY:
 
-                _mode_verify(&args, m, s, ui);
+                _mode_verify(&args, s, ui);
                 break;
 
             //rescan based on file, print results, save to a file
             case MODE_VERIFY_WRITE:
 
-                _mode_verify_write(&args, m, s, ui);
+                _mode_verify_write(&args, s, ui);
                 break;
 
         } //end switch

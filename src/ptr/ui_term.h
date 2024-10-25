@@ -28,8 +28,7 @@ class ui_term : public ui_base {
                                             const unsigned int vma_total,
                                             const int human_thread_id);
         
-        virtual void output_ptrchains(const void * args_ptr,
-                                      const void * s_ptr, const void * m_ptr);
+        virtual void output_ptrchains(const void * args_ptr, const void * s_ptr);
 };
 
 

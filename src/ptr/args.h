@@ -62,9 +62,9 @@ typedef struct {
     cm_byte byte_width;         //architecture bit width (32bit/64bit, etc.)
     uintptr_t target_addr;     //root node address
     
-    size_t max_struct_size;    //max struct size
-    unsigned int max_depth;    //max tree levels
-    unsigned int threads;      //number of worker threads to use
+    unsigned int max_struct_size; //max struct size
+    unsigned int max_depth;       //max tree levels
+    unsigned int threads;         //number of worker threads to use
     
     std::vector<region> extra_static_areas;  //user supplied vmas to treat as static
     std::vector<region> exclusive_rw_areas;  //user supplied vmas to exclusively scan
@@ -72,6 +72,7 @@ typedef struct {
 
     //internal
     std::string target_comm;
+    int mode;
 
 } args_struct;
 

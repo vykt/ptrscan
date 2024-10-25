@@ -7,6 +7,8 @@
 
 #include <unistd.h>
 
+#include <linux/limits.h>
+
 #include <pthread.h>
 #include <libcmore.h>
 #include <liblain.h>
@@ -19,7 +21,7 @@
 
 
 //get longest basename
-static inline void _get_column_sizes(const serialiser * s, const mem * m, 
+static inline void _get_column_sizes(const args_struct * args, const serialiser * s, 
                                      std::vector<int> * column_sizes) {
 
     int max;
@@ -35,20 +37,31 @@ static inline void _get_column_sizes(const serialiser * s, const mem * m,
     cm_list_node * obj_node;
     ln_vm_obj * obj;
 
-    const std::vector<serial_entry> * ptrchains = s->get_ptrchains();
-    const std::vector<cm_list_node *> * rw_objs = s->get_rw_objs();
-
+    const std::vector<serial_entry> * ptrchains   = s->get_ptrchains();
+    const std::vector<cm_list_node *> * rw_objs   = s->get_rw_objs();
+    const std::vector<std::string> * read_rw_objs = s->get_read_rw_objs();
 
     //for every pointer chain
     for (int i = 0; i < (int) ptrchains->size(); ++i) {
 
-        //get object
         s_entry = (serial_entry *) &(*ptrchains)[i];
-        obj_node = (*rw_objs)[s_entry->rw_objs_index];
-        obj = LN_GET_NODE_OBJ(obj_node);
 
-        //get length of basename
-        current_basename_len = strlen(obj->basename);
+        //if in read mode
+        if (args->mode == MODE_READ) {
+            current_basename_len = strnlen((*read_rw_objs)
+                                           [s_entry->rw_objs_index].c_str(), NAME_MAX);
+
+        //else in scan / verify modes
+        } else {
+        
+            //get object
+            obj_node = (*rw_objs)[s_entry->rw_objs_index];
+            obj = LN_GET_NODE_OBJ(obj_node);
+
+            //get length of basename
+            current_basename_len = strnlen(obj->basename, NAME_MAX);
+
+        } //end if
 
         //update max as required
         if (max < current_basename_len) max = current_basename_len;
@@ -128,10 +141,10 @@ inline void ui_term::report_thread_progress(const unsigned int vma_done,
  */
 
 //print out results
-void ui_term::output_ptrchains(const void * args_ptr, 
-                               const void * s_ptr, const void * m_ptr) {
+void ui_term::output_ptrchains(const void * args_ptr, const void * s_ptr) {
 
     int len;
+    char * basename;
 
     serial_entry * s_entry;
     cm_list_node * obj_node;
@@ -145,21 +158,24 @@ void ui_term::output_ptrchains(const void * args_ptr,
     //typecast arg
     args_struct * args = (args_struct *) args_ptr;
     serialiser * s = (serialiser *) s_ptr;
-    mem * m = (mem *) m_ptr;
 
     //get serialiser vectors
-    const std::vector<serial_entry> * ptrchains = s->get_ptrchains();
-    const std::vector<cm_list_node *> * rw_objs = s->get_rw_objs();
-
+    const std::vector<serial_entry> * ptrchains   = s->get_ptrchains();
+    const std::vector<cm_list_node *> * rw_objs   = s->get_rw_objs();
+    const std::vector<std::string> * read_rw_objs = s->get_read_rw_objs();
 
     //get column widths
-    _get_column_sizes(s, m, &column_sizes);
+    _get_column_sizes(args, s, &column_sizes);
 
-
-    //output header
-    std::cout << "\nptrscan for: " << args->target_str 
-              << " | target addr: 0x" << std::hex << args->target_addr
-              << "\n\n";
+    
+    //output header if not reading
+    if (args->mode != MODE_READ) {
+        std::cout << "\ntarget name: " << args->target_str 
+                  << " | target addr: 0x" << std::hex << args->target_addr
+                  << std::dec << "\n\n";
+    } else {
+        std::cout << "\nreading file: " << args->input_file << "\n\n";
+    }
 
     //for every pointer chain
     for (unsigned int i = 0; i < ptrchains->size(); ++i) {
@@ -175,14 +191,20 @@ void ui_term::output_ptrchains(const void * args_ptr,
             print_buf.append(GREEN);
         }
 
-        //get object of pointer chain
-        obj_node = (*rw_objs)[s_entry->rw_objs_index];
-        obj = LN_GET_NODE_OBJ(obj_node);
+        //get basename of obj for pointer chain
+        if (args->mode == MODE_READ) {
+            basename = (char *) (*read_rw_objs)[s_entry->rw_objs_index].c_str();
+
+        } else {
+            obj_node = (*rw_objs)[s_entry->rw_objs_index];
+            obj = LN_GET_NODE_OBJ(obj_node);
+            basename = obj->basename; 
+        }
 
         //format basename
-        len = column_sizes[0] - strlen(obj->basename);
+        len = column_sizes[0] - strlen(basename);
         print_buf.append(len, ' ');
-        print_buf.append(obj->basename);
+        print_buf.append(basename);
         print_buf.append(" + ");
 
         //format remaining offsets
@@ -213,9 +235,10 @@ void ui_term::output_ptrchains(const void * args_ptr,
     } //end for
    
     //output footer
-    std::cout << "\nfound " << std::dec << ptrchains->size() 
-              << " chains | alignment: "  << args->alignment
-              << " | max struct size: 0x" << std::hex << args->max_struct_size 
-              << " | depth: " << std::dec << args->max_depth 
+    std::cout << "\nfound " << ptrchains->size() 
+              << " chains | byte width: "  << (int) s->get_byte_width()
+              << " | alignment: " << (int) s->get_alignment()
+              << "\nmax struct size: 0x " << std::hex << s->get_max_struct_size()
+              << " | max depth: " << std::dec << s->get_max_depth()
               << std::endl;
 }

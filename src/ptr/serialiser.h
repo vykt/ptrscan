@@ -5,6 +5,8 @@
 
 #include <cstdint>
 
+#include <linux/limits.h>
+
 #include <libcmore.h>
 #include <liblain.h>
 
@@ -41,21 +43,30 @@ class serialiser {
     private:
         //attributes
         cm_byte byte_width;
+        cm_byte alignment;
+        unsigned int max_struct_size;
+        unsigned int max_depth;
+
+        //ptrchains
         std::vector<serial_entry> ptrchains;
 
         //intermediate representation (vectors can contain null ptrs)
         std::vector<cm_list_node *> rw_objs;
         std::vector<cm_list_node *> static_objs;
 
+        //read representation (no null strings)
+        std::vector<std::string> read_rw_objs;
+        std::vector<std::string> read_static_objs;
 
     private:
         //methods
         void record_metadata(FILE * fs);
         void read_metadata(FILE * fs);
         void record_region_definitions(const mem * m, FILE * fs);
-        void read_region_definitions(const mem * m, FILE * fs);
-        void record_offsets(const mem * m, FILE * fs);
-        void read_offsets(const mem * m, FILE * fs);
+        void read_region_definitions(const args_struct * args,
+                                     const mem * m, FILE * fs);
+        void record_offsets(FILE * fs);
+        void read_offsets(FILE * fs);
 
         void entry_to_disk_obj(serial_entry * s_entry);
         void recurse_offset(const mem_node * m_node, 
@@ -77,9 +88,16 @@ class serialiser {
 
         //getters & setters
         cm_byte get_byte_width() const;
+        cm_byte get_alignment() const;
+        unsigned int get_max_struct_size() const;
+        unsigned int get_max_depth() const;
+
         const std::vector<serial_entry> * get_ptrchains() const;
         const std::vector<cm_list_node *> * get_rw_objs() const;
         const std::vector<cm_list_node *> * get_static_objs() const;
+        const std::vector<std::string> * get_read_rw_objs() const;
+        const std::vector<std::string> * get_read_static_objs() const;
+
 };
 
 
