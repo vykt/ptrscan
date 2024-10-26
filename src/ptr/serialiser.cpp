@@ -434,8 +434,9 @@ void serialiser::recurse_down(const args_struct * args, const mem * m,
         s_entry.offsets.push_back(offset);
 
         //recursively traverse to root, adding offsets in the process
-        this->recurse_offset(m_node->get_parent(), 
-                             &s_entry, m_node->get_ptr_addr());
+        if (current_depth != 0) this->recurse_offset(m_node->get_parent(), 
+                                                     &s_entry, 
+                                                     m_node->get_ptr_addr());
 
         //add this serial entry to the ptrchains vector
         this->ptrchains.push_back(s_entry);
@@ -581,9 +582,9 @@ void serialiser::remove_duplicate_objs() {
                 objs[i]->erase(objs[i]->begin() + j - 1);
                 
                 //correct iteration state
-                j -= 1;
                 prev_obj_node = (*objs[i])[j - 1];
                 prev_obj = LN_GET_NODE_OBJ(prev_obj_node);
+                j -= 1;
                 continue;
 
             } //end if basename the same

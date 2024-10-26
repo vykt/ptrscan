@@ -39,7 +39,7 @@ inline const pid_t mem::interpret_target(args_struct * args) {
         pid = (pid_t) std::stoi(args->target_str);
         
         //get process name
-        ret = ln_name_by_pid(this->pid, proc_name);
+        ret = ln_name_by_pid(pid, proc_name);
         if (ret) {
             throw std::runtime_error(exception_str[0]);
         }
