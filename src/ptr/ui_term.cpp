@@ -238,7 +238,7 @@ void ui_term::output_ptrchains(const void * args_ptr, const void * s_ptr) {
     std::cout << "\nfound " << ptrchains->size() 
               << " chains | byte width: "  << (int) s->get_byte_width()
               << " | alignment: " << (int) s->get_alignment()
-              << "\nmax struct size: 0x " << std::hex << s->get_max_struct_size()
+              << "\nmax struct size: 0x" << std::hex << s->get_max_struct_size()
               << " | max depth: " << std::dec << s->get_max_depth()
               << std::endl;
 }
