@@ -285,7 +285,8 @@ void mem::populate_areas(args_struct * args) {
         } //end if vma has backing object
 
         //if vma has rw-/rwx permissions
-        if (vma->access != (LN_ACCESS_READ | LN_ACCESS_WRITE))
+        if ((vma->access & LN_ACCESS_READ) == 0
+            || (vma->access & LN_ACCESS_WRITE) == 0)
             goto populate_areas_next;
 
         //if user specified an exclusive set of vmas to scan

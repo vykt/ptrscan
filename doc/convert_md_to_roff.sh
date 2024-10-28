@@ -1,7 +1,7 @@
 #!/bin/bash
 
 PROJECT="ptrscan"
-VERSION="v1.0.0"
+VERSION="v1.0.2"
 DATE="Oct 2024"
 
 SRC_DIR="md"
