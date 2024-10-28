@@ -15,7 +15,7 @@ The output produced by **ptrscan** can be used to locate and/or navigate data st
 
 **ptrscan** can save the discovered pointer chains to a *.pscan* file. **pscan** can then verify the saved pointer chains against a different instance of the target process to eliminate the vast majority of false positives.
 
-A pointer chain consists of a starting address, denoted by the basename of a backing object, followed by a series of offsets. To resolve backing object addresses, refer to the appropriate */proc/<pid>/maps* entries.
+A pointer chain consists of a starting address, denoted by the basename of a backing object, followed by a series of offsets. To resolve backing object addresses, refer to the appropriate */proc/[pid]/maps* entries.
 
 
 ### OPTIONS
@@ -50,8 +50,8 @@ Report on progress for each thread at each depth level. This floods the terminal
 **-A** *ALIGNMENT*, **--alignment**=*ALIGNMENT*  
 Boundary to which pointers are aligned. For example: If set to 4, **ptrscan** will only scan for pointers at 0x4, 0x8, 0xc, [...].
 
-**-b** *BIT_WIDTH*, **--byte-width**=*BIT_WIDTH*  
-Maximum number of bytes the target's architecture can process simultaneously. For example: On x86 byte width is 4, on x86\_64 byte idth is 8.
+**-b** *BYTE_WIDTH*, **--byte-width**=*BYTE_WIDTH*  
+Maximum number of bytes the target's architecture can process simultaneously. For example: On x86 byte width is 4, on x86\_64 byte width is 8.
 
 **-a** *ADDRESS*, **--target-address**=*ADDRESS*  
 Address to pointer scan for.

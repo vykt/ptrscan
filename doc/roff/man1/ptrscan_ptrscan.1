@@ -35,7 +35,7 @@ of false positives.
 A pointer chain consists of a starting address, denoted by the basename
 of a backing object, followed by a series of offsets.
 To resolve backing object addresses, refer to the appropriate
-\f[I]/proc//maps\f[R] entries.
+\f[I]/proc/[pid]/maps\f[R] entries.
 .SS OPTIONS
 \f[B]\-w\f[R] \f[I]OUTPUT_FILE\f[R],
 \f[B]\[en]output\-file\f[R]=\f[I]OUTPUT_FILE\f[R]
@@ -114,14 +114,14 @@ Boundary to which pointers are aligned.
 For example: If set to 4, \f[B]ptrscan\f[R] will only scan for pointers
 at 0x4, 0x8, 0xc, [\&...].
 .PP
-\f[B]\-b\f[R] \f[I]BIT_WIDTH\f[R],
-\f[B]\[en]byte\-width\f[R]=\f[I]BIT_WIDTH\f[R]
+\f[B]\-b\f[R] \f[I]BYTE_WIDTH\f[R],
+\f[B]\[en]byte\-width\f[R]=\f[I]BYTE_WIDTH\f[R]
 .PD 0
 .P
 .PD
 Maximum number of bytes the target\[cq]s architecture can process
 simultaneously.
-For example: On x86 byte width is 4, on x86_64 byte idth is 8.
+For example: On x86 byte width is 4, on x86_64 byte width is 8.
 .PP
 \f[B]\-a\f[R] \f[I]ADDRESS\f[R],
 \f[B]\[en]target\-address\f[R]=\f[I]ADDRESS\f[R]
