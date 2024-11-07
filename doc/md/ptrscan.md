@@ -13,7 +13,7 @@ Pointer chain scanner (ptrscan)
 Given a target process and a target address, **ptrscan** will scan all virtual memory areas with read & write permissions and locate pointer chains leading to the target address.
 The output produced by **ptrscan** can be used to locate and/or navigate data structures of a target process.
 
-**ptrscan** can save the discovered pointer chains to a *.pscan* file. **pprscan** can then verify the saved pointer chains against a different instance of the target process to eliminate the vast majority of false positives.
+**ptrscan** can save the discovered pointer chains to a *.pscan* file. **ptrscan** can then verify the saved pointer chains against a different instance of the target process to eliminate the vast majority of false positives.
 
 A pointer chain consists of a starting address, denoted by the basename of a backing object, followed by a series of offsets. To resolve backing object addresses, refer to the appropriate */proc/[pid]/maps* entries.
 
