@@ -4,6 +4,11 @@
     <img src="ptrscan.png" width="150" height="150">
 </p>
 
+### NOTE:
+
+**ptrscan**'s dependencies are undergoing major testing & minor refactors. If you're looking to get **ptrscan** running, install [libcmore v0.0.3](https://gitub.com/vykt/cmore/releases/tag/0.0.3) and [liblain v1.0.2](https//github.com/vykt/liblain/releases/tag/1.0.2).
+
+
 ### ABOUT:
 
 Pointer Scanner (**ptrscan**) is a dynamic analysis utility for discovering related pointers within a target process. 
