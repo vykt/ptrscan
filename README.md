@@ -6,7 +6,7 @@
 
 ### NOTE:
 
-**ptrscan**'s dependencies are undergoing major testing & minor refactors. Prebuilt binaries & static builds are coming. To get **ptrscan** running in the meantime, install the latest release, [libcmore v0.0.3](https://gitub.com/vykt/cmore/releases/tag/0.0.3), and [liblain v1.0.2](https//github.com/vykt/liblain/releases/tag/1.0.2).
+**ptrscan**'s dependencies are undergoing major testing & minor refactors. Prebuilt binaries & static builds are coming. To get **ptrscan** running in the meantime, install the latest release, [libcmore v0.0.3](https://github.com/vykt/cmore/releases/tag/0.0.3), and [liblain v1.0.2](https//github.com/vykt/liblain/releases/tag/1.0.2).
 
 
 ### ABOUT:
